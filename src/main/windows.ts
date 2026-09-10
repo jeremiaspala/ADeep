@@ -3,7 +3,7 @@
  * complementos de MMC. Todas comparten el mismo proceso principal y, por lo tanto,
  * la misma conexión LDAP.
  */
-import { app, BrowserWindow, nativeTheme, shell } from 'electron'
+import { app, BrowserWindow, nativeImage, nativeTheme, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
@@ -58,15 +58,19 @@ const windows = new Map<ConsoleId, BrowserWindow>()
 let paths = {
   renderer: join(app.getAppPath(), 'out/renderer'),
   preload: join(app.getAppPath(), 'out/preload/index.js'),
-  icon: join(app.getAppPath(), 'build/icon.png')
+  icons: join(app.getAppPath(), 'build/icons')
 }
 
 export function setPaths(mainDir: string): void {
   paths = {
     renderer: join(mainDir, '../renderer'),
     preload: join(mainDir, '../preload/index.js'),
-    icon: join(mainDir, '../../build/icon.png')
+    icons: join(mainDir, '../../build/icons')
   }
+}
+
+function iconFor(id: ConsoleId): string {
+  return join(paths.icons, `${id}.png`)
 }
 
 export function openConsole(id: ConsoleId): BrowserWindow {
@@ -87,7 +91,7 @@ export function openConsole(id: ConsoleId): BrowserWindow {
     autoHideMenuBar: true,
     title: def.title,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#12141a' : '#f4f5f7',
-    icon: paths.icon,
+    icon: iconFor(id),
     webPreferences: {
       preload: paths.preload,
       sandbox: false,
@@ -98,6 +102,11 @@ export function openConsole(id: ConsoleId): BrowserWindow {
       additionalArguments: [`--adeep-console=${id}`]
     }
   })
+
+  // En X11 el ícono de la barra de tareas sale de _NET_WM_ICON, que se fija así.
+  // Las cuatro consolas corren en el mismo proceso, por eso va por ventana.
+  const icon = nativeImage.createFromPath(iconFor(id))
+  if (!icon.isEmpty()) win.setIcon(icon)
 
   win.on('ready-to-show', () => win.show())
   win.on('closed', () => windows.delete(id))

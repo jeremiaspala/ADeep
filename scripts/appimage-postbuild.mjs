@@ -21,7 +21,6 @@ import { chmod, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'no
 import { execFile } from 'node:child_process'
 import { createReadStream } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
-import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -63,6 +62,20 @@ async function patchAppRun(appDir, consoleId) {
   await writeFile(path, patched, { mode: 0o755 })
 }
 
+/** Cada AppImage lleva el ícono de su consola, en el .DirIcon y en el png del AppDir. */
+async function patchIcon(appDir, c) {
+  const { readdir, copyFile } = await import('node:fs/promises')
+  const src = join(root, 'build', 'icons', `${c.id}.png`)
+  if (!(await exists(src))) return
+  for (const f of await readdir(appDir)) {
+    if (f.endsWith('.png') || f === '.DirIcon') await copyFile(src, join(appDir, f))
+  }
+  const usr = join(appDir, 'usr/share/icons/hicolor/512x512/apps')
+  if (await exists(usr)) {
+    for (const f of await readdir(usr)) await copyFile(src, join(usr, f))
+  }
+}
+
 async function patchDesktop(appDir, c) {
   const { readdir } = await import('node:fs/promises')
   const entry = (await readdir(appDir)).find((f) => f.endsWith('.desktop'))
@@ -73,14 +86,15 @@ async function patchDesktop(appDir, c) {
     .replace(/^Name=.*$/m, `Name=${c.name}`)
     .replace(/^Exec=.*$/m, `Exec=AppRun --no-sandbox --console=${c.id} %U`)
     .replace(/^Comment=.*$/m, `Comment=${c.comment}`)
+    .replace(/^GenericName=.*$/m, `GenericName=${c.generic}`)
   await writeFile(path, patched)
 }
 
 const CONSOLES = [
-  { id: 'aduc', file: 'ADeep-Usuarios-y-equipos', name: 'ADeep — Usuarios y equipos', comment: 'Usuarios, grupos, equipos y OUs de Active Directory' },
-  { id: 'sites', file: 'ADeep-Sitios-y-servicios', name: 'ADeep — Sitios y servicios', comment: 'Sitios, subredes, vínculos y replicación de AD' },
-  { id: 'trusts', file: 'ADeep-Dominios-y-confianzas', name: 'ADeep — Dominios y confianzas', comment: 'Dominios del bosque, confianzas y sufijos UPN' },
-  { id: 'dfs', file: 'ADeep-DFS', name: 'ADeep — Administración de DFS', comment: 'Espacios de nombres DFS y replicación DFS-R' }
+  { id: 'aduc', file: 'ADeep-Usuarios-y-equipos', name: 'ADeep — Usuarios y equipos', generic: 'Usuarios y equipos de Active Directory', comment: 'Usuarios, grupos, equipos y OUs de Active Directory' },
+  { id: 'sites', file: 'ADeep-Sitios-y-servicios', name: 'ADeep — Sitios y servicios', generic: 'Sitios y servicios de Active Directory', comment: 'Sitios, subredes, vínculos y replicación de AD' },
+  { id: 'trusts', file: 'ADeep-Dominios-y-confianzas', name: 'ADeep — Dominios y confianzas', generic: 'Dominios y confianzas de Active Directory', comment: 'Dominios del bosque, confianzas y sufijos UPN' },
+  { id: 'dfs', file: 'ADeep-DFS', name: 'ADeep — Administración de DFS', generic: 'Administración de DFS', comment: 'Espacios de nombres DFS y replicación DFS-R' }
 ]
 
 /** Entradas de menú que apuntan a cada AppImage ya generado. */
@@ -88,14 +102,16 @@ async function writeLaunchers(built) {
   const dir = join(root, 'release', 'launchers')
   await mkdir(dir, { recursive: true })
 
+  const { copyFile } = await import('node:fs/promises')
   for (const { console: c, file } of built) {
+    await copyFile(join(root, 'build', 'icons', `${c.id}.png`), join(dir, `adeep-${c.id}.png`))
     const desktop = [
       '[Desktop Entry]',
       'Type=Application',
       `Name=${c.name}`,
       `Comment=${c.comment}`,
       `Exec=${file} %U`,
-      'Icon=adeep',
+      `Icon=adeep-${c.id}`,
       'Terminal=false',
       'Categories=System;',
       'StartupWMClass=ADeep',
@@ -113,7 +129,7 @@ async function writeLaunchers(built) {
     'mkdir -p "$DEST" "$ICONS"',
     'DIR="$(cd "$(dirname "$0")" && pwd)"',
     'cp "$DIR"/adeep-*.desktop "$DEST"/',
-    '[ -f "$DIR/../../build/icon.png" ] && cp "$DIR/../../build/icon.png" "$ICONS/adeep.png" || true',
+    'for f in "$DIR"/*.png; do [ -f "$f" ] && cp "$f" "$ICONS/"; done',
     'update-desktop-database "$DEST" 2>/dev/null || true',
     'echo "Lanzadores instalados en $DEST"',
     ''
@@ -127,7 +143,10 @@ async function main() {
   await ensureRuntime()
   const source = await findAppImage()
   const version = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version
-  const work = await mkdtemp(join(tmpdir(), 'adeep-appimage-'))
+  // /tmp suele ser un tmpfs en RAM y acá se manejan cientos de MB: se trabaja en disco.
+  const scratch = join(root, 'release', '.build')
+  await mkdir(scratch, { recursive: true })
+  const work = await mkdtemp(join(scratch, 'appimage-'))
 
   try {
     console.log('• extrayendo la carga útil')
@@ -140,6 +159,7 @@ async function main() {
       console.log(`• ${c.name}`)
       await patchAppRun(appDir, c.id)
       await patchDesktop(appDir, c)
+      await patchIcon(appDir, c)
 
       const sqfs = join(work, `${c.id}.sqfs`)
       await run('mksquashfs', [

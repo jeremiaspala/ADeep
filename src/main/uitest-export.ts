@@ -64,8 +64,7 @@ async function main(): Promise<void> {
   await wait(1500)
 
   console.log(abierto ? '✓ abrió el diálogo de guardar' : '✗ NO abrió ningún diálogo')
-  // @ts-expect-error restauración
-  dialog.showSaveDialog = original
+  Object.assign(dialog, { showSaveDialog: original })
 
   const image = await win.webContents.capturePage()
   await writeFile(join(OUT, 'export-csv.png'), image.toPNG())

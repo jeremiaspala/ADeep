@@ -6,6 +6,8 @@ directories:
   output: release
 files:
   - out/**
+  # Los íconos por consola se leen en tiempo de ejecución para la barra de tareas.
+  - build/icons/*.png
   - '!**/*.map'
   - '!node_modules/**/{test,__tests__,tests,example,examples,doc,docs}/**'
   - '!node_modules/**/*.{md,markdown,ts,map}'
@@ -27,7 +29,9 @@ linux:
     Name: ADeep
     GenericName: Usuarios y equipos de Active Directory
     Keywords: active directory;ldap;ad;usuarios;grupos;dominio;
-    StartupWMClass: ADeep
+    # Electron reporta WM_CLASS=adeep (el nombre de la app), y tiene que coincidir
+    # o el panel no asocia la ventana con el lanzador y muestra un ícono genérico.
+    StartupWMClass: adeep
 appImage:
   artifactName: ${productName}-${version}-${arch}.${ext}
 npmRebuild: false
