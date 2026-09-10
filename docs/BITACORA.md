@@ -175,6 +175,42 @@ funcionan quedaron con nombres que dicen lo que hacen.
 
 Después de esto: 170 ítems de menú recorridos, **0 sin efecto**.
 
+### 13. Refresco automático entre ventanas
+
+Pregunta de Jeremías: «¿el refresco es automático?». La respuesta era «a medias»: cada consola
+recargaba su propia vista después de escribir, pero si se cambiaba algo desde **otra** ventana
+de ADeep, esa quedaba vieja hasta apretar F5. Es la misma clase de bug del punto 12, sólo que
+entre ventanas.
+
+Como las nueve consolas comparten proceso, se resolvió sin sondeo:
+
+- El envoltorio `handle` del puente IPC clasifica cada canal con un regex (`ESCRITURA`) y, si
+  la llamada **terminó bien** y era de escritura, emite `directory.changed` con
+  `broadcastExcept(event.sender.id, …)`: a todas las ventanas menos a la que escribió, que ya
+  recargó sola.
+- Cada consola se suscribe y recarga su vista actual con un retardo de 400 ms, así un alta que
+  dispara varias escrituras seguidas provoca **una sola** recarga.
+
+Nada de esto genera tráfico si nadie escribe. El sondeo periódico se descartó a propósito: con
+una zona DNS de 620 nombres, 634 usuarios y cuatro ventanas abiertas, sería castigar al DC para
+nada.
+
+De los 141 canales del puente, 64 quedan clasificados como escritura y 77 como lectura. Las
+trampas del regex eran `sites.validateSubnet` (valida, no escribe), `obj.protect.get` /
+`obj.cannotChangePassword.get` (los `.get` de pares get/set) y los `store.*`, que tocan
+preferencias locales y no el directorio.
+
+**Verificación** (`npm run uitest:refresh`, 39 comprobaciones, todas en verde): clasifica los
+canales, abre ADUC y Sitios contra el dominio real y comprueba que una escritura desde una
+ventana avisa a la otra y no a sí misma, que la que recibe el aviso **vuelve a leer del
+directorio** de verdad, y que una ráfaga de cinco escrituras se colapsa en una sola recarga.
+El arnés no escribe nada: reemplaza `obj.modify` por un doble que devuelve true sin tocar LDAP,
+de modo que se ejercita el camino real —envoltorio, difusión, preload y suscripción— sin riesgo
+en producción.
+
+Lo que sigue sin refrescarse solo son los cambios hechos **fuera** de ADeep (otro admin en una
+consola de Windows, un script). Para eso hace falta F5, y es deliberado.
+
 ### Lo que quedó pendiente
 
 - **Las escrituras nunca se probaron contra un dominio real.** Las lecturas sí, exhaustivamente.
@@ -195,4 +231,5 @@ Después de esto: 170 ítems de menú recorridos, **0 sin efecto**.
 | Objetos con round-trip de descriptor de seguridad verificado | 14 848 |
 | Registros DNS reconstruidos byte a byte | 726 |
 | Atributos `gPLink` reconstruidos | 57 |
+| Canales IPC clasificados (64 escriben, 77 leen) | 141 |
 | Bugs encontrados por los arneses | 16 |

@@ -101,7 +101,13 @@ export default function App(): JSX.Element {
         setDialog({ t: 'connect' })
       }
     })
-    return () => { offTheme(); offSession() }
+    // Otra ventana escribió en el directorio: esta vista quedó vieja.
+    let t: ReturnType<typeof setTimeout> | undefined
+    const offDir = window.adeep.app.onDirectoryChange(() => {
+      clearTimeout(t)
+      t = setTimeout(() => void refresh(), 400)
+    })
+    return () => { offTheme(); offSession(); clearTimeout(t); offDir() }
     // Sólo al montar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])

@@ -59,7 +59,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }): JSX.E
 
       <div className="kv">
         <span className="k">Versión</span>
-        <span className="v">0.5.1</span>
+        <span className="v">0.5.2</span>
         <span className="k">Autor</span>
         <span className="v">Jeremías Palazzesi</span>
         <span className="k">Blog</span>

@@ -1,6 +1,6 @@
 {
   "name": "adeep",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "ADeep — administración de Active Directory para Linux",
   "main": "./out/main/index.js",
   "author": "Jeremías Palazzesi <jeremiaspalazzesi@gmail.com> (https://fundamenta.ar)",
@@ -10,6 +10,7 @@
     "build": "electron-vite build",
     "validate": "electron-vite build && electron out/main/validate.js --no-sandbox",
     "uitest": "electron-vite build && electron out/main/uitest.js --no-sandbox",
+    "uitest:refresh": "electron-vite build && electron out/main/uitest-refresh.js --no-sandbox",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "start": "electron-vite preview",
     "dist": "electron-vite build && electron-builder --linux AppImage && node scripts/appimage-postbuild.mjs",

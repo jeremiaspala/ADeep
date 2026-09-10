@@ -98,6 +98,11 @@ dependencia de runtime. Todo el trabajo sucio está resuelto a mano en el proces
 - **`msDS-TrustForestTrustInfo`** — espacios de nombres de una confianza de bosque.
 - SIDs, GUIDs, FILETIME, DNs, `userAccountControl`, `groupType` y compañía.
 
+Las nueve consolas comparten proceso y **una sola sesión LDAP**. Eso hace que el refresco entre
+ventanas salga barato: cuando una consola escribe, el puente IPC avisa a las demás y cada una
+recarga su vista. Sin sondeo — si nadie escribe, no hay tráfico. Los cambios hechos fuera de
+ADeep sí necesitan F5.
+
 ```
 src/
   main/          proceso principal: LDAP y una carpeta por consola
@@ -128,6 +133,7 @@ perfil guardado. **Son de sólo lectura**, para poder correrlos sin riesgo:
 ```sh
 npm run validate     # 56 verificaciones de sólo lectura contra el DC del perfil
 npm run uitest       # abre las nueve consolas, conecta y captura pantalla
+npm run uitest:refresh  # dos consolas: una escribe, la otra recarga sola
 
 npx electron out/main/uitest-audit.js --no-sandbox   # recorre todos los ítems de menú
 npx electron out/main/uitest-switch.js --no-sandbox  # verifica el cambio de consola

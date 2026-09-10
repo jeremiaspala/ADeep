@@ -103,6 +103,17 @@ export default function ConsoleShell({
     return () => window.removeEventListener('keydown', onKey)
   }, [onRefresh])
 
+  /* Otra ventana escribió en el directorio: esta vista quedó vieja. */
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined
+    const off = window.adeep.app.onDirectoryChange(() => {
+      // Varias escrituras seguidas (un alta con permisos, por ejemplo) recargan una sola vez.
+      clearTimeout(t)
+      t = setTimeout(onRefresh, 400)
+    })
+    return () => { clearTimeout(t); off() }
+  }, [onRefresh])
+
   const disconnect = async (): Promise<void> => {
     const res = await window.adeep.session.disconnect()
     if (res.ok) setDialog('connect')

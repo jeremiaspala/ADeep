@@ -142,6 +142,12 @@ const api = {
     /** Consola que dibuja esta ventana (la inyecta el proceso principal). */
     consoleId: (process.argv.find((a) => a.startsWith('--adeep-console=')) ?? '').split('=')[1] || 'aduc',
     openConsole: (id: string) => ipcRenderer.invoke('app.openConsole', id) as Promise<boolean>,
+    /** Alguien escribió en el directorio desde otra consola. */
+    onDirectoryChange: (cb: (channel: string) => void) => {
+      const listener = (_e: unknown, channel: string): void => cb(channel)
+      ipcRenderer.on('directory.changed', listener)
+      return () => ipcRenderer.removeListener('directory.changed', listener)
+    },
     consoles: () => ipcRenderer.invoke('app.consoles') as Promise<{ id: string; title: string }[]>,
     copy: (text: string) => call<boolean>('app.copy', text),
     exportCsv: (rows: string[][], name: string) => call<string | null>('app.exportCsv', rows, name),

@@ -169,6 +169,16 @@ export function broadcast(channel: string, ...args: unknown[]): void {
   for (const win of allWindows()) win.webContents.send(channel, ...args)
 }
 
+/**
+ * Igual que broadcast pero salteando a quien originó el cambio: esa ventana ya
+ * recargó su vista por su cuenta y no necesita hacerlo dos veces.
+ */
+export function broadcastExcept(senderId: number, channel: string, ...args: unknown[]): void {
+  for (const win of allWindows()) {
+    if (win.webContents.id !== senderId) win.webContents.send(channel, ...args)
+  }
+}
+
 export function consoleIdFromArgv(argv: string[]): ConsoleId {
   const arg = argv.find((a) => a.startsWith('--console='))
   const id = arg?.split('=')[1] as ConsoleId | undefined

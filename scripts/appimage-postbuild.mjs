@@ -46,7 +46,12 @@ async function findAppImage() {
   const { readdir } = await import('node:fs/promises')
   const files = (await readdir(dir)).filter((f) => f.endsWith('.AppImage'))
   if (!files.length) throw new Error('No se encontró ningún .AppImage en release/')
-  return join(dir, files[0])
+  // Las versiones viejas quedan en release/: hay que parchear la de este build,
+  // no la primera que devuelva readdir.
+  const { version } = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+  const actual = files.find((f) => f.includes(`-${version}-`))
+  if (!actual) throw new Error(`No se encontró el AppImage ${version} en release/`)
+  return join(dir, actual)
 }
 
 async function patchAppRun(appDir) {

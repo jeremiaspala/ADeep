@@ -11,7 +11,7 @@ import {
 import * as ops from './ldap/operations'
 import * as store from './store'
 import { registerConsoleIpc } from './ipc-consoles'
-import { broadcast } from './windows'
+import { broadcast, broadcastExcept } from './windows'
 import { SDFlagsControl } from './ldap/controls'
 import { buildSecurityDescriptor, parseSecurityDescriptor, SD_FLAGS } from './ldap/sddl'
 import {
@@ -40,14 +40,23 @@ function fail(err: unknown): AppResult<never> {
   return { ok: false, error: e.message, code: e.code }
 }
 
+/**
+ * Canales que modifican el directorio. Se usan para avisarle al resto de las
+ * ventanas que su vista quedó vieja; no hay sondeo, sólo esto.
+ */
+export const ESCRITURA =
+  /^(create\.|ldapb\.create$|obj\.(?!.*\.get$)|group\.(add|remove|setPrimary)|security\.write$|sites\.(create|set|move|update|delete|rootDseOperation|replicateObject)|trusts\.(update|set|raise)|dfs\.(set|create|delete)|dns\.(add|replace|delete|create)|gpo\.(link|unlink|set|move))/
+
 /** Envuelve un handler para que nunca tire una excepción cruzando el puente. */
-function handle<A extends unknown[], R>(
+export function handle<A extends unknown[], R>(
   channel: string,
   fn: (...args: A) => Promise<R> | R
 ): void {
-  ipcMain.handle(channel, async (_e, ...args) => {
+  ipcMain.handle(channel, async (e, ...args) => {
     try {
-      return ok(await fn(...(args as A)))
+      const result = ok(await fn(...(args as A)))
+      if (ESCRITURA.test(channel)) broadcastExcept(e.sender.id, 'directory.changed', channel)
+      return result
     } catch (err) {
       return fail(err)
     }
