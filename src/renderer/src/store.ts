@@ -58,7 +58,8 @@ export const useApp = create<AppState>((set) => ({
     columns: ['name', 'kind', 'description'],
     language: 'es',
     confirmDelete: true,
-    density: 'comfortable'
+    density: 'comfortable',
+    hardwareAcceleration: false
   },
   theme: 'light',
 

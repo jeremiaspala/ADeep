@@ -1,6 +1,6 @@
 /** Persistencia de perfiles, consultas guardadas y preferencias en ~/.config/adeep. */
 import { app, safeStorage } from 'electron'
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { ConnectionProfile, Preferences, SavedQuery } from '../shared/types'
 
@@ -20,7 +20,8 @@ const DEFAULT_PREFS: Preferences = {
   columns: ['name', 'kind', 'description'],
   language: 'es',
   confirmDelete: true,
-  density: 'comfortable'
+  density: 'comfortable',
+  hardwareAcceleration: false
 }
 
 let cache: StoreShape | null = null
@@ -38,6 +39,20 @@ async function readJSON<T>(path: string, fallback: T): Promise<T> {
     return JSON.parse(await fs.readFile(path, 'utf8')) as T
   } catch {
     return fallback
+  }
+}
+
+/**
+ * Lectura sincrónica: `app.disableHardwareAcceleration()` tiene que llamarse antes
+ * de que Electron esté listo, y para entonces no hay tiempo de un await.
+ */
+export function getPrefsSync(): Preferences {
+  try {
+    const raw = readFileSync(join(app.getPath('userData'), 'adeep.json'), 'utf8')
+    const data = JSON.parse(raw) as Partial<StoreShape>
+    return { ...DEFAULT_PREFS, ...(data.prefs ?? {}) }
+  } catch {
+    return DEFAULT_PREFS
   }
 }
 

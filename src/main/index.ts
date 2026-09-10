@@ -2,13 +2,21 @@ import { app, nativeTheme, Menu, ipcMain, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { registerIpc } from './ipc'
-import { getPrefs } from './store'
+import { getPrefs, getPrefsSync } from './store'
 import { CONSOLES, broadcast, consoleIdFromArgv, openConsole, setPaths, type ConsoleId } from './windows'
 
 // Sin esto, ejecutar el bundle suelto guarda los perfiles en ~/.config/Electron.
 app.setName('adeep')
 app.setPath('userData', join(app.getPath('appData'), 'adeep'))
 setPaths(__dirname)
+
+// Esta UI es DOM y tablas: la composición por GPU sólo agrega un proceso pesado.
+if (!getPrefsSync().hardwareAcceleration) {
+  app.disableHardwareAcceleration()
+  app.commandLine.appendSwitch('disable-gpu')
+  app.commandLine.appendSwitch('disable-software-rasterizer')
+  app.commandLine.appendSwitch('disable-gpu-compositing')
+}
 
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('ar.com.adeep')

@@ -66,6 +66,21 @@ export class ConnectionError extends Error {
   }
 }
 
+/** Map con techo: descarta la entrada más vieja al llenarse. */
+class BoundedMap<K, V> extends Map<K, V> {
+  constructor(private readonly limit: number) {
+    super()
+  }
+
+  set(key: K, value: V): this {
+    if (!this.has(key) && this.size >= this.limit) {
+      const oldest = this.keys().next()
+      if (!oldest.done) this.delete(oldest.value)
+    }
+    return super.set(key, value)
+  }
+}
+
 export class AdConnection {
   readonly client: Client
   readonly profile: ConnectionProfile
@@ -75,9 +90,9 @@ export class AdConnection {
   whoami?: string
   machineAccountQuota?: number
   /** Cache SID → nombre para mostrar en la pestaña Seguridad. */
-  readonly sidNameCache = new Map<string, string>()
+  readonly sidNameCache = new BoundedMap<string, string>(5000)
   /** Cache GUID → nombre de clase/atributo del esquema. */
-  readonly schemaGuidCache = new Map<string, string>()
+  readonly schemaGuidCache = new BoundedMap<string, string>(3000)
 
   private constructor(client: Client, profile: ConnectionProfile) {
     this.client = client

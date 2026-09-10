@@ -255,6 +255,31 @@ Opciones de transporte:
 
 ---
 
+## 3 bis. Consumo de recursos (medido el 2026-09-10)
+
+Medido con PSS sobre el árbol de procesos, bajo Xvfb (todo por software, así que el proceso
+de GPU pesa más que con una placa real):
+
+| | 1 consola | 4 consolas |
+|---|---|---|
+| Proceso principal (Node + LDAP) | 84 MB | 72 MB |
+| Renderer por consola | 88 MB | 53-56 MB c/u |
+| Proceso de GPU | 44 MB | 97 MB |
+| Zygotes + servicio de red | 52 MB | 43 MB |
+| **Total** | **269 MB** | **433 MB** |
+
+Conclusiones:
+
+- El piso de una consola es ~270 MB y cada consola adicional cuesta ~55 MB. Es el precio de
+  ventanas separadas: **la palanca real es cerrar las consolas que no se usan.**
+- Apagar la composición por GPU ahorra 14-19 MB de forma reproducible. Viene apagada por
+  defecto y se puede volver a prender en Preferencias (requiere reiniciar).
+- **Probado y descartado:** `--in-process-gpu` elimina el proceso de GPU pero mueve sus ~98 MB
+  al proceso principal, con un total igual o peor. `--renderer-process-limit=1` no consolida
+  nada: Electron le da un renderer propio a cada ventana igual.
+- Las caches de resolución del directorio (SID → nombre, GUID → clase) tienen techo
+  (5000 y 3000 entradas) para que una sesión larga no crezca sin control.
+
 ## 4. Convenciones del proyecto
 
 - **UI y mensajes de error en español rioplatense.** Los identificadores del código, en inglés.

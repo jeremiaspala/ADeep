@@ -76,6 +76,12 @@ export default function PreferencesDialog({ onClose }: { onClose: () => void }):
           onChange={(v) => patch({ confirmDelete: v })}
         />
         <Check2
+          label="Usar aceleración por hardware"
+          checked={draft.hardwareAcceleration}
+          onChange={(v) => patch({ hardwareAcceleration: v })}
+          hint="Apagarla ahorra ~18 MB y esta interfaz no la necesita. Requiere reiniciar."
+        />
+        <Check2
           label="Mostrar usuarios y grupos como contenedores"
           checked={draft.showUsersGroupsAsContainers}
           onChange={(v) => patch({ showUsersGroupsAsContainers: v })}

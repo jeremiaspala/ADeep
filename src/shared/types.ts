@@ -298,6 +298,8 @@ export interface Preferences {
   language: 'es' | 'en'
   confirmDelete: boolean
   density: 'comfortable' | 'compact'
+  /** Composición por GPU. Apagada ahorra ~100 MB y esta UI no la necesita. */
+  hardwareAcceleration: boolean
 }
 
 export interface AppResult<T> {
