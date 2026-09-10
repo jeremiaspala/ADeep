@@ -1,6 +1,6 @@
 {
   "name": "adeep",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ADeep — Active Directory Users and Computers for Linux",
   "main": "./out/main/index.js",
   "author": "Jeremias Palazzesi",
