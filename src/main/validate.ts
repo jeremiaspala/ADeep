@@ -388,6 +388,66 @@ async function main(): Promise<void> {
     return back.length === 2 && back[0].enabled && !back[1].enabled && back[1].server === 'srv2'
   }, (ok) => ok ? 'correcto' : 'FALLA')
 
+  /* ---------------- DNS ---------------- */
+
+  const dnsOps = await import('./dns/operations')
+  const zones = await check('dns.zones', () => dnsOps.listZones(conn),
+    (l) => `${l.length} zonas: ${l.map((z) => `${z.name}(${z.records})`).join(', ')}`)
+
+  // La zona con más nombres: es la que mejor ejercita el códec.
+  const zonaDirecta = [...(zones ?? [])].sort((a, b) => b.records - a.records)[0]
+  if (zonaDirecta) {
+    const nodos = await check(`dns.nodes (${zonaDirecta.name})`, () => dnsOps.listNodes(conn, zonaDirecta.dn),
+      (l) => {
+        const porTipo = new Map<string, number>()
+        for (const n of l) for (const r of n.records) porTipo.set(r.typeName, (porTipo.get(r.typeName) ?? 0) + 1)
+        return `${l.length} nombres, registros por tipo: ${[...porTipo].map(([t, c]) => `${t}=${c}`).join(' ')}`
+      })
+    if (nodos) {
+      console.log()
+      for (const n of nodos.filter((x) => x.records.some((r) => ['A', 'CNAME', 'MX', 'SRV', 'TXT', 'SOA'].includes(r.typeName))).slice(0, 8)) {
+        for (const r of n.records) console.log(`   ${n.name.padEnd(34)} ${r.typeName.padEnd(6)} ttl=${String(r.ttl).padEnd(6)} ${r.data}`)
+      }
+      console.log()
+    }
+    await check('dns.zoneDetails', () => dnsOps.zoneDetails(conn, zonaDirecta.dn),
+      (d) => `SOA ${d.soa?.fields.primary ?? '—'}, ${d.ns.length} NS, envejecimiento ${d.aging ? 'sí' : 'no'}, actualizaciones: ${d.updates ?? '—'}`)
+  }
+
+  await check('dns.servers', () => dnsOps.listDnsServers(conn), (l) => l.join(', ') || 'ninguno')
+
+  // El códec tiene que reproducir byte a byte lo que ya está en el directorio.
+  await check('dns: round-trip del códec sobre la zona real', async () => {
+    const { parseRecord, buildRecord } = await import('./dns/record')
+    const raw = await conn.searchRaw(zonaDirecta!.dn, {
+      scope: 'one', filter: '(objectClass=dnsNode)', attributes: ['dnsRecord'], pageSize: 500
+    })
+    let total = 0
+    let iguales = 0
+    const distintos: string[] = []
+    for (const e of raw) {
+      for (const v of e.attrs.dnsRecord ?? []) {
+        if (!Buffer.isBuffer(v)) continue
+        const rec = parseRecord(v)
+        if (!rec || !['A', 'AAAA', 'CNAME', 'NS', 'PTR', 'MX', 'TXT', 'SRV'].includes(rec.typeName)) continue
+        total++
+        const rebuilt = buildRecord({ type: rec.type, ttl: rec.ttl, fields: rec.fields })
+        // Sólo se compara la parte de datos: la cabecera lleva serial y timestamp propios.
+        if (rebuilt.subarray(24).equals(v.subarray(24, 24 + v.readUInt16LE(0)))) iguales++
+        else if (distintos.length < 3) distintos.push(`${rec.typeName}:${rec.data}`)
+      }
+    }
+    return { total, iguales, distintos }
+  }, (r) => r.total === r.iguales
+    ? `${r.total} registros reconstruidos idénticos`
+    : `${r.iguales}/${r.total} idénticos — REVISAR: ${r.distintos.join(' | ')}`)
+
+  /* ---------------- DHCP ---------------- */
+
+  const dhcpOps = await import('./dhcp/operations')
+  await check('dhcp.state', () => dhcpOps.getState(conn),
+    (d) => `${d.servers.length} servidor(es) autorizado(s)${d.servers.length ? ': ' + d.servers.map((s) => `${s.name ?? ''} ${s.address}`).join(', ') : ''}; ${d.candidates.length} equipo(s) con SPN de DHCP`)
+
   await conn.disconnect()
 
   /* ---------------- Reporte ---------------- */

@@ -2,7 +2,7 @@
 
 > Documento de continuidad. Si retomás la sesión sin contexto previo, **leé esto primero**
 > y seguí por la fase que esté marcada como en curso.
-> Última actualización: 2026-09-10 (fases 0 a 3 terminadas, v0.3.2 publicada).
+> Última actualización: 2026-09-10 (seis consolas, v0.4.0 publicada).
 
 **El objetivo declarado es rehacer RSAT para Linux desde cero**: una aplicación por
 complemento de MMC, todas con el mismo lenguaje visual y sobre la misma base LDAP.
@@ -229,7 +229,25 @@ formato mucho más incómodo. **Alcance sugerido: sólo lectura en v1.**
       Editar los que ya existen sí es LDAP. Los servidores releen AD por sondeo (hasta 1 h),
       así que hay que avisar que el cambio no es inmediato.
 
-### Fase 4 — Consola de administración de DHCP
+### Fase 5 — DNS  ✅ terminada
+
+Zonas `dnsZone` y nombres `dnsNode` en `DC=DomainDnsZones`, `DC=ForestDnsZones` y el
+contenedor heredado de `CN=System`. Cada nombre guarda sus registros en el atributo
+multivaluado `dnsRecord`, un blob binario por registro.
+
+- [x] Códec de `dnsRecord` (MS-DNSP 2.3.2.2) para A, AAAA, NS, CNAME, SOA, PTR, MX, TXT y SRV.
+      **Ojo: el TTL es big-endian** y los nombres van en `DNS_COUNT_NAME`
+      (largo total + cantidad de etiquetas + etiquetas con prefijo de largo).
+      Verificado reconstruyendo los **726 registros** de la zona principal del dominio real:
+      todos idénticos byte a byte.
+- [x] Árbol de zonas directas e inversas, lista de registros con filtro, alta, edición y baja.
+- [x] Propiedades de zona leídas de `dNSProperty` (actualizaciones dinámicas, envejecimiento,
+      intervalos). **Ojo:** `ALLOW_UPDATE` viene con `dataLength=1` pero el valor igual está
+      en el DWORD; descartar por largo se come esa propiedad.
+- [ ] Pendiente: crear y borrar zonas desde la UI (el backend ya está), reenvío condicional,
+      transferencias de zona y el resto de `dNSProperty`.
+
+### Fase 4 — Consola de administración de DHCP  ◐ parcial
 
 **Este es el único que no se resuelve con LDAP y necesita una decisión de arquitectura.**
 En AD sólo vive la lista de servidores autorizados:
@@ -245,10 +263,12 @@ Opciones de transporte:
 | **C. SSH + `netsh dhcp`** | Requiere OpenSSH en el DC; parseo de texto frágil. | Plan B de A |
 | **D. ISC Kea vía API REST** (control-agent, JSON) o `dhcpd` + OMAPI | Trivial comparado con el resto, si el DHCP corre en Linux. | **Recomendado si el DHCP es Kea/ISC** |
 
-- [ ] **DECISIÓN PENDIENTE — preguntar antes de codear: ¿el DHCP a administrar es el de
-      Windows Server o uno Linux (ISC dhcpd / Kea)?** El resto de la fase depende de esto.
-- [ ] Autorizar / desautorizar servidores DHCP en AD (esto sí es LDAP y se puede hacer ya,
-      independiente de la decisión anterior).
+- [x] Lo que da LDAP: servidores autorizados (`dhcpServers` en `CN=DhcpRoot`) y equipos que
+      publican el SPN `DHCPServer/*`. En el dominio de Jeremías **ambas listas están vacías**,
+      así que su DHCP no es de Windows o no está integrado con el dominio.
+- [ ] **DECISIÓN PENDIENTE.** Jeremías pidió expresamente charlar antes de meter WinRM o
+      cualquier cosa riesgosa. La consola muestra la tabla de opciones y no toca nada más.
+- [ ] Autorizar / desautorizar servidores desde la UI (es LDAP, se puede hacer sin decidir nada).
 - [ ] Transporte elegido, con perfil de conexión propio (host, credenciales, puerto).
 - [ ] Árbol: servidor → IPv4/IPv6 → ámbitos → (conjunto de direcciones, concesiones,
       reservas, opciones), superámbitos, directivas, filtros MAC.

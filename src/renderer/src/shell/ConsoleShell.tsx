@@ -29,7 +29,9 @@ const CONSOLE_LABELS: Record<string, string> = {
   aduc: 'Usuarios y equipos',
   sites: 'Sitios y servicios',
   trusts: 'Dominios y confianzas',
-  dfs: 'Administración de DFS'
+  dfs: 'Administración de DFS',
+  dns: 'DNS',
+  dhcp: 'DHCP'
 }
 
 export default function ConsoleShell({

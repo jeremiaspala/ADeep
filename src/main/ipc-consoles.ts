@@ -7,6 +7,8 @@ import type { AdConnection } from './ldap/connection'
 import * as sites from './sites/operations'
 import * as trusts from './trusts/operations'
 import * as dfs from './dfs/operations'
+import * as dns from './dns/operations'
+import * as dhcp from './dhcp/operations'
 import type { DfsTarget } from '../shared/types'
 
 export type HandleFn = <A extends unknown[], R>(
@@ -139,4 +141,38 @@ export function registerConsoleIpc(handle: HandleFn, requireConn: () => AdConnec
     await dfs.setDfsrMemberEnabled(requireConn(), subscriptionDN, enabled)
     return true
   })
+
+  /* ---------------- DNS ---------------- */
+
+  handle('dns.zones', async () => dns.listZones(requireConn()))
+  handle('dns.nodes', async (zoneDN: string) => dns.listNodes(requireConn(), zoneDN))
+  handle('dns.zoneDetails', async (zoneDN: string) => dns.zoneDetails(requireConn(), zoneDN))
+  handle('dns.servers', async () => dns.listDnsServers(requireConn()))
+
+  handle('dns.addRecord', async (zoneDN: string, nodeName: string, input: dns.RecordInput) => {
+    await dns.addRecord(requireConn(), zoneDN, nodeName, input)
+    return true
+  })
+  handle('dns.replaceRecord', async (nodeDN: string, original: string, input: dns.RecordInput) => {
+    await dns.replaceRecord(requireConn(), nodeDN, original, input)
+    return true
+  })
+  handle('dns.deleteRecord', async (nodeDN: string, original: string) => {
+    await dns.deleteRecord(requireConn(), nodeDN, original)
+    return true
+  })
+  handle('dns.deleteNode', async (nodeDN: string) => {
+    await dns.deleteNode(requireConn(), nodeDN)
+    return true
+  })
+  handle('dns.createZone', async (name: string, scope: dns.ZoneScope) =>
+    dns.createZone(requireConn(), name, scope))
+  handle('dns.deleteZone', async (zoneDN: string) => {
+    await dns.deleteZone(requireConn(), zoneDN)
+    return true
+  })
+
+  /* ---------------- DHCP ---------------- */
+
+  handle('dhcp.state', async () => dhcp.getState(requireConn()))
 }

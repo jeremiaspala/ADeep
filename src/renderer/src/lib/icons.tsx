@@ -47,6 +47,12 @@ export const KIND_LABEL: Record<NodeKind, string> = {
   dfsrContent: 'Contenido replicado',
   dfsrMember: 'Miembro',
   dfsrConnection: 'Conexión de replicación',
+  dnsRoot: 'DNS',
+  dnsZone: 'Zona de búsqueda directa',
+  dnsReverseZone: 'Zona de búsqueda inversa',
+  dnsRecord: 'Registro',
+  dhcpRoot: 'DHCP',
+  dhcpServer: 'Servidor DHCP',
   unknown: 'Objeto'
 }
 
@@ -90,6 +96,12 @@ const COLORS: Record<NodeKind, string> = {
   dfsrContent: '#c8a24a',
   dfsrMember: '#4f8cff',
   dfsrConnection: '#7cc0e0',
+  dnsRoot: '#0891b2',
+  dnsZone: '#0891b2',
+  dnsReverseZone: '#5cc2a0',
+  dnsRecord: '#7cc0e0',
+  dhcpRoot: '#e11d48',
+  dhcpServer: '#e07c9e',
   unknown: '#8b95a3'
 }
 
@@ -143,6 +155,12 @@ export function KindIcon({
     case 'dfsrContent': return <Folder {...props} />
     case 'dfsrMember': return <Server {...props} />
     case 'dfsrConnection': return <Cable {...props} />
+    case 'dnsRoot':
+    case 'dnsZone': return <Globe {...props} />
+    case 'dnsReverseZone': return <Waypoints {...props} />
+    case 'dnsRecord': return <FileQuestion {...props} />
+    case 'dhcpRoot':
+    case 'dhcpServer': return <Server {...props} />
     default: return <FileQuestion {...props} />
   }
 }

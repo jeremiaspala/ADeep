@@ -1,9 +1,9 @@
 {
   "name": "adeep",
-  "version": "0.3.2",
-  "description": "ADeep — Active Directory Users and Computers for Linux",
+  "version": "0.4.0",
+  "description": "ADeep — administración de Active Directory para Linux",
   "main": "./out/main/index.js",
-  "author": "Jeremias Palazzesi",
+  "author": "Jeremías Palazzesi <jeremiaspalazzesi@gmail.com> (https://fundamenta.ar)",
   "license": "MIT",
   "scripts": {
     "dev": "electron-vite dev",

@@ -1,20 +1,17 @@
 /**
- * Convierte el único AppImage que genera electron-builder en **un AppImage por
- * consola**, todos con la misma carga útil:
+ * Prepara el AppImage que genera electron-builder:
  *
  *  1. Reemplaza el runtime de 2019 (appimage-12.0.1) por el runtime estático de
  *     type2-runtime, que usa fusermount3. El viejo pide libfuse.so.2 y en
  *     distros con sólo FUSE 3 el AppImage no arranca ("dlopen(): error loading
  *     libfuse.so.2").
- *  2. Parchea AppRun para pasar siempre --no-sandbox y la consola que le toca:
- *     el montaje FUSE es nosuid, así que chrome-sandbox nunca puede ser setuid y
- *     Electron aborta si no recibe --no-sandbox.
- *  3. Reescribe el .desktop de cada uno con su nombre propio.
+ *  2. Parchea AppRun para pasar siempre --no-sandbox: el montaje FUSE es nosuid,
+ *     así que chrome-sandbox nunca puede ser setuid y Electron aborta sin eso.
+ *  3. Genera un lanzador .desktop por consola, cada uno con su ícono y con
+ *     `--console=<id>`.
  *
- * Los cuatro comparten el bloqueo de instancia única de Electron: abrir el
- * segundo estando el primero corriendo no levanta otro proceso, le pide al que ya
- * está que abra esa consola. Así la sesión LDAP se comparte y no hay que
- * autenticarse cuatro veces.
+ * Es **un solo binario** para todas las consolas: comparten proceso y, por lo
+ * tanto, la sesión LDAP. Abrir una segunda consola no vuelve a pedir credenciales.
  */
 import { createWriteStream } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -52,69 +49,45 @@ async function findAppImage() {
   return join(dir, files[0])
 }
 
-async function patchAppRun(appDir, consoleId) {
+async function patchAppRun(appDir) {
   const path = join(appDir, 'AppRun')
   const src = await readFile(path, 'utf8')
-  const flags = `--no-sandbox --console=${consoleId}`
   const patched = src
-    .replace(/exec "\$BIN"( --no-sandbox[^\n]*)?\n/, `exec "$BIN" ${flags}\n`)
-    .replace(/exec "\$BIN"( --no-sandbox[^"]*)? "\$\{args\[@\]\}"/, `exec "$BIN" ${flags} "\${args[@]}"`)
+    .replace(/exec "\$BIN"( --no-sandbox[^\n]*)?\n/, 'exec "$BIN" --no-sandbox\n')
+    .replace(/exec "\$BIN"( --no-sandbox[^"]*)? "\$\{args\[@\]\}"/, 'exec "$BIN" --no-sandbox "\${args[@]}"')
   await writeFile(path, patched, { mode: 0o755 })
 }
 
-/** Cada AppImage lleva el ícono de su consola, en el .DirIcon y en el png del AppDir. */
-async function patchIcon(appDir, c) {
-  const { readdir, copyFile } = await import('node:fs/promises')
-  const src = join(root, 'build', 'icons', `${c.id}.png`)
-  if (!(await exists(src))) return
-  for (const f of await readdir(appDir)) {
-    if (f.endsWith('.png') || f === '.DirIcon') await copyFile(src, join(appDir, f))
-  }
-  const usr = join(appDir, 'usr/share/icons/hicolor/512x512/apps')
-  if (await exists(usr)) {
-    for (const f of await readdir(usr)) await copyFile(src, join(usr, f))
-  }
-}
-
-async function patchDesktop(appDir, c) {
-  const { readdir } = await import('node:fs/promises')
-  const entry = (await readdir(appDir)).find((f) => f.endsWith('.desktop'))
-  if (!entry) return
-  const path = join(appDir, entry)
-  const src = await readFile(path, 'utf8')
-  const patched = src
-    .replace(/^Name=.*$/m, `Name=${c.name}`)
-    .replace(/^Exec=.*$/m, `Exec=AppRun --no-sandbox --console=${c.id} %U`)
-    .replace(/^Comment=.*$/m, `Comment=${c.comment}`)
-    .replace(/^GenericName=.*$/m, `GenericName=${c.generic}`)
-  await writeFile(path, patched)
-}
-
 const CONSOLES = [
-  { id: 'aduc', file: 'ADeep-Usuarios-y-equipos', name: 'ADeep — Usuarios y equipos', generic: 'Usuarios y equipos de Active Directory', comment: 'Usuarios, grupos, equipos y OUs de Active Directory' },
-  { id: 'sites', file: 'ADeep-Sitios-y-servicios', name: 'ADeep — Sitios y servicios', generic: 'Sitios y servicios de Active Directory', comment: 'Sitios, subredes, vínculos y replicación de AD' },
-  { id: 'trusts', file: 'ADeep-Dominios-y-confianzas', name: 'ADeep — Dominios y confianzas', generic: 'Dominios y confianzas de Active Directory', comment: 'Dominios del bosque, confianzas y sufijos UPN' },
-  { id: 'dfs', file: 'ADeep-DFS', name: 'ADeep — Administración de DFS', generic: 'Administración de DFS', comment: 'Espacios de nombres DFS y replicación DFS-R' }
+  { id: 'aduc', name: 'ADeep — Usuarios y equipos', generic: 'Usuarios y equipos de Active Directory', comment: 'Usuarios, grupos, equipos y OUs de Active Directory' },
+  { id: 'sites', name: 'ADeep — Sitios y servicios', generic: 'Sitios y servicios de Active Directory', comment: 'Sitios, subredes, vínculos y replicación de AD' },
+  { id: 'trusts', name: 'ADeep — Dominios y confianzas', generic: 'Dominios y confianzas de Active Directory', comment: 'Dominios del bosque, confianzas y sufijos UPN' },
+  { id: 'dfs', name: 'ADeep — Administración de DFS', generic: 'Administración de DFS', comment: 'Espacios de nombres DFS y replicación DFS-R' },
+  { id: 'dns', name: 'ADeep — DNS', generic: 'DNS integrado en Active Directory', comment: 'Zonas y registros DNS del directorio' },
+  { id: 'dhcp', name: 'ADeep — DHCP', generic: 'DHCP', comment: 'Servidores DHCP autorizados en el dominio' }
 ]
 
-/** Entradas de menú que apuntan a cada AppImage ya generado. */
-async function writeLaunchers(built) {
+/** Un lanzador por consola, todos apuntando al mismo AppImage. */
+async function writeLaunchers(appImage) {
   const dir = join(root, 'release', 'launchers')
   await mkdir(dir, { recursive: true })
 
   const { copyFile } = await import('node:fs/promises')
-  for (const { console: c, file } of built) {
+  for (const c of CONSOLES) {
     await copyFile(join(root, 'build', 'icons', `${c.id}.png`), join(dir, `adeep-${c.id}.png`))
     const desktop = [
       '[Desktop Entry]',
       'Type=Application',
       `Name=${c.name}`,
+      `GenericName=${c.generic}`,
       `Comment=${c.comment}`,
-      `Exec=${file} %U`,
+      `Exec=${appImage} --console=${c.id} %U`,
       `Icon=adeep-${c.id}`,
       'Terminal=false',
       'Categories=System;',
-      'StartupWMClass=ADeep',
+      // Tiene que coincidir con el WM_CLASS que reporta Electron, o el panel no
+      // asocia la ventana con su lanzador y muestra un ícono genérico.
+      'StartupWMClass=adeep',
       ''
     ].join('\n')
     await writeFile(join(dir, `adeep-${c.id}.desktop`), desktop, { mode: 0o755 })
@@ -141,45 +114,39 @@ async function writeLaunchers(built) {
 
 async function main() {
   await ensureRuntime()
-  const source = await findAppImage()
-  const version = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')).version
+  const appImage = await findAppImage()
   // /tmp suele ser un tmpfs en RAM y acá se manejan cientos de MB: se trabaja en disco.
   const scratch = join(root, 'release', '.build')
   await mkdir(scratch, { recursive: true })
   const work = await mkdtemp(join(scratch, 'appimage-'))
 
   try {
-    console.log('• extrayendo la carga útil')
-    await run(source, ['--appimage-extract'], { cwd: work, maxBuffer: 64 * 1024 * 1024 })
+    console.log('• extrayendo el AppImage')
+    await run(appImage, ['--appimage-extract'], { cwd: work, maxBuffer: 64 * 1024 * 1024 })
     const appDir = join(work, 'squashfs-root')
-    await rm(source)
 
-    const built = []
-    for (const c of CONSOLES) {
-      console.log(`• ${c.name}`)
-      await patchAppRun(appDir, c.id)
-      await patchDesktop(appDir, c)
-      await patchIcon(appDir, c)
+    await patchAppRun(appDir)
 
-      const sqfs = join(work, `${c.id}.sqfs`)
-      await run('mksquashfs', [
-        appDir, sqfs,
-        '-root-owned', '-noappend', '-no-xattrs',
-        '-comp', 'gzip', '-b', '131072', '-mkfs-time', '0'
-      ], { maxBuffer: 64 * 1024 * 1024 })
+    console.log('• recomprimiendo squashfs')
+    const sqfs = join(work, 'payload.sqfs')
+    await run('mksquashfs', [
+      appDir, sqfs,
+      '-root-owned', '-noappend', '-no-xattrs',
+      '-comp', 'gzip', '-b', '131072', '-mkfs-time', '0'
+    ], { maxBuffer: 64 * 1024 * 1024 })
 
-      const file = join(root, 'release', `${c.file}-${version}-x86_64.AppImage`)
-      await pipeline(createReadStream(runtimePath), createWriteStream(file))
-      await pipeline(createReadStream(sqfs), createWriteStream(file, { flags: 'a' }))
-      await chmod(file, 0o755)
-      await rm(sqfs)
+    console.log('• uniendo runtime + squashfs')
+    const out = `${appImage}.new`
+    await pipeline(createReadStream(runtimePath), createWriteStream(out))
+    await pipeline(createReadStream(sqfs), createWriteStream(out, { flags: 'a' }))
+    await chmod(out, 0o755)
+    await rm(appImage)
+    await rename(out, appImage)
 
-      const { size } = await stat(file)
-      console.log(`  ✓ ${file} (${(size / 1024 / 1024).toFixed(0)} MB)`)
-      built.push({ console: c, file })
-    }
+    const { size } = await stat(appImage)
+    console.log(`✓ ${appImage} (${(size / 1024 / 1024).toFixed(0)} MB)`)
 
-    await writeLaunchers(built)
+    await writeLaunchers(appImage)
   } finally {
     await rm(work, { recursive: true, force: true })
   }

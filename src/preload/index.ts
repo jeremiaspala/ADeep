@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppResult, AttributeValue, ConnectionProfile, CreateComputerInput, CreateContactInput,
   CreateGroupInput, CreateOUInput, CreateUserInput, DfsNamespace, DfsTarget, DfsrGroup,
-  DirEntry, DomainControllerInfo, DsaServerInfo, ForestInfo, FsmoRoles, GroupMembership,
+  DhcpState, DirEntry, DnsNode, DnsZone, DnsZoneDetails,
+  DomainControllerInfo, DsaServerInfo, ForestInfo, FsmoRoles, GroupMembership,
   Modification, PartitionInfo, PasswordPolicy, Preferences, SavedQuery, SearchRequest,
   SearchResult, SecurityDescriptor, SessionInfo, SiteInfo, SiteLinkInfo, SubnetInfo,
   TrustInfo
@@ -216,6 +217,26 @@ const api = {
       call<boolean>('dfs.setSchedule', dn, schedule),
     setMemberEnabled: (subscriptionDN: string, enabled: boolean) =>
       call<boolean>('dfs.setMemberEnabled', subscriptionDN, enabled)
+  },
+
+  dns: {
+    zones: () => call<DnsZone[]>('dns.zones'),
+    nodes: (zoneDN: string) => call<DnsNode[]>('dns.nodes', zoneDN),
+    zoneDetails: (zoneDN: string) => call<DnsZoneDetails>('dns.zoneDetails', zoneDN),
+    servers: () => call<string[]>('dns.servers'),
+    addRecord: (zoneDN: string, nodeName: string, input: { type: number; ttl: number; fields: Record<string, string | number> }) =>
+      call<boolean>('dns.addRecord', zoneDN, nodeName, input),
+    replaceRecord: (nodeDN: string, original: string, input: { type: number; ttl: number; fields: Record<string, string | number> }) =>
+      call<boolean>('dns.replaceRecord', nodeDN, original, input),
+    deleteRecord: (nodeDN: string, original: string) => call<boolean>('dns.deleteRecord', nodeDN, original),
+    deleteNode: (nodeDN: string) => call<boolean>('dns.deleteNode', nodeDN),
+    createZone: (name: string, scope: 'domain' | 'forest' | 'legacy') =>
+      call<string>('dns.createZone', name, scope),
+    deleteZone: (zoneDN: string) => call<boolean>('dns.deleteZone', zoneDN)
+  },
+
+  dhcp: {
+    state: () => call<DhcpState>('dhcp.state')
   },
 
   theme: {

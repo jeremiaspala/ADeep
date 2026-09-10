@@ -74,6 +74,8 @@ export type NodeKind =
   // DFS
   | 'dfsRoot' | 'dfsNamespace' | 'dfsFolder' | 'dfsTarget'
   | 'dfsrRoot' | 'dfsrGroup' | 'dfsrContent' | 'dfsrMember' | 'dfsrConnection'
+  // DNS y DHCP
+  | 'dnsRoot' | 'dnsZone' | 'dnsReverseZone' | 'dnsRecord' | 'dhcpRoot' | 'dhcpServer'
   | 'unknown'
 
 export interface DirEntry {
@@ -509,4 +511,62 @@ export interface DfsrGroup {
   members: DfsrMember[]
   connections: DfsrConnectionInfo[]
   schedule?: boolean[]
+}
+
+/* ---------------- DNS ---------------- */
+
+export interface DnsZone {
+  dn: string
+  name: string
+  scope: 'domain' | 'forest' | 'legacy'
+  scopeLabel: string
+  reverse: boolean
+  records: number
+}
+
+export interface DnsRecordView {
+  type: number
+  typeName: string
+  ttl: number
+  /** Representación en texto, como la muestra la consola de Windows. */
+  data: string
+  fields: Record<string, string | number>
+  /** timeStamp 0: no lo borra el proceso de limpieza. */
+  static: boolean
+  /** El blob original en base64, para poder modificar o borrar ese valor exacto. */
+  raw: string
+}
+
+export interface DnsNode {
+  dn: string
+  name: string
+  fqdn: string
+  tombstoned: boolean
+  records: DnsRecordView[]
+}
+
+export interface DnsZoneDetails {
+  soa?: DnsRecordView
+  ns: DnsRecordView[]
+  aging: boolean
+  noRefresh?: number
+  refresh?: number
+  updates?: string
+  zoneType?: number
+}
+
+/* ---------------- DHCP ---------------- */
+
+export interface DhcpAuthorizedServer {
+  /** Dirección IP publicada en el directorio. */
+  address: string
+  name?: string
+}
+
+export interface DhcpState {
+  /** CN=DhcpRoot,CN=NetServices,CN=Services,CN=Configuration */
+  rootDN?: string
+  servers: DhcpAuthorizedServer[]
+  /** Equipos del dominio que publican el SPN del servicio DHCP. */
+  candidates: { name: string; dnsHostName?: string; dn: string }[]
 }

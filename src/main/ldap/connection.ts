@@ -30,7 +30,9 @@ const BINARY_ATTRS = [
   // Sitios, confianzas y DFS.
   'invocationId', 'pKT', 'pKTGuid', 'msDS-TrustForestTrustInfo',
   'msDFS-TargetListv2', 'msDFS-GenerationGUIDv2', 'msDFS-NamespaceIdentityGUIDv2',
-  'msDFS-LinkIdentityGUIDv2', 'msDFSR-ExtensionsGuid', 'msDFSR-MemberReferenceBL'
+  'msDFS-LinkIdentityGUIDv2', 'msDFSR-ExtensionsGuid', 'msDFSR-MemberReferenceBL',
+  // DNS integrado en AD.
+  'dnsRecord', 'dnsProperty', 'dNSProperty'
 ]
 
 /** Nombre normalizado (minúsculas) de todos los atributos binarios. */

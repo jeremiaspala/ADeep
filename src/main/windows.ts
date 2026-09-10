@@ -7,7 +7,7 @@ import { app, BrowserWindow, nativeImage, nativeTheme, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
-export type ConsoleId = 'aduc' | 'sites' | 'trusts' | 'dfs'
+export type ConsoleId = 'aduc' | 'sites' | 'trusts' | 'dfs' | 'dns' | 'dhcp'
 
 export interface ConsoleDef {
   id: ConsoleId
@@ -46,6 +46,20 @@ export const CONSOLES: Record<ConsoleId, ConsoleDef> = {
     page: 'dfs.html',
     width: 1340,
     height: 860
+  },
+  dns: {
+    id: 'dns',
+    title: 'ADeep — DNS',
+    page: 'dns.html',
+    width: 1360,
+    height: 860
+  },
+  dhcp: {
+    id: 'dhcp',
+    title: 'ADeep — DHCP',
+    page: 'dhcp.html',
+    width: 1240,
+    height: 800
   }
 }
 

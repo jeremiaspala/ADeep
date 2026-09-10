@@ -88,10 +88,13 @@ async function auditarConsola(id: ConsoleId, etiqueta: string): Promise<void> {
           it?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
         })()`)
         await wait(350)
-        const subItems = await js<string[]>(win, `(() => {
+        const subItems = await js<{ label: string; disabled: boolean }[]>(win, `(() => {
           const pops = [...document.querySelectorAll('.menu-pop')]
           if (pops.length < 2) return []
-          return [...pops[pops.length - 1].querySelectorAll('.menu-item')].map(x => x.textContent.trim())
+          return [...pops[pops.length - 1].querySelectorAll('.menu-item')].map(x => ({
+            label: x.textContent.trim(),
+            disabled: x.classList.contains('disabled')
+          }))
         })()`)
 
         if (!subItems.length) {
@@ -99,7 +102,11 @@ async function auditarConsola(id: ConsoleId, etiqueta: string): Promise<void> {
           continue
         }
 
-        for (const sub of subItems) {
+        for (const { label: sub, disabled } of subItems) {
+          if (disabled) {
+            hallazgos.push({ consola: etiqueta, menu: `${menu} › ${nombre}`, item: sub, resultado: 'deshabilitado' })
+            continue
+          }
           await cerrarPopups(win)
           await js(win, `[...document.querySelectorAll('.menu-btn')].find(b => b.textContent.trim() === ${JSON.stringify(menu)})?.click()`)
           await wait(280)
@@ -195,7 +202,9 @@ async function main(): Promise<void> {
     ['aduc', 'Usuarios y equipos'],
     ['sites', 'Sitios y servicios'],
     ['trusts', 'Dominios y confianzas'],
-    ['dfs', 'DFS']
+    ['dfs', 'DFS'],
+    ['dns', 'DNS'],
+    ['dhcp', 'DHCP']
   ] as [ConsoleId, string][]) {
     await auditarConsola(id, etiqueta)
   }

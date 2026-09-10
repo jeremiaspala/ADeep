@@ -12,9 +12,11 @@ export default defineConfig({
           // Arnés de validación de sólo lectura: `npm run validate`.
           validate: resolve(__dirname, 'src/main/validate.ts'),
           uitest: resolve(__dirname, 'src/main/uitest.ts'),
+          probe: resolve(__dirname, 'src/main/probe.ts'),
           'uitest-menu': resolve(__dirname, 'src/main/uitest-menu.ts'),
           'uitest-audit': resolve(__dirname, 'src/main/uitest-audit.ts'),
-          'uitest-export': resolve(__dirname, 'src/main/uitest-export.ts')
+          'uitest-export': resolve(__dirname, 'src/main/uitest-export.ts'),
+          'uitest-about': resolve(__dirname, 'src/main/uitest-about.ts')
         }
       }
     }
@@ -41,7 +43,9 @@ export default defineConfig({
           index: resolve(__dirname, 'src/renderer/index.html'),
           sites: resolve(__dirname, 'src/renderer/sites.html'),
           trusts: resolve(__dirname, 'src/renderer/trusts.html'),
-          dfs: resolve(__dirname, 'src/renderer/dfs.html')
+          dfs: resolve(__dirname, 'src/renderer/dfs.html'),
+          dns: resolve(__dirname, 'src/renderer/dns.html'),
+          dhcp: resolve(__dirname, 'src/renderer/dhcp.html')
         }
       }
     },
