@@ -1,6 +1,6 @@
 # ADeep
 
-**Administración de Active Directory para Linux.** Un RSAT hecho de cero: seis consolas con el
+**Administración de Active Directory para Linux.** Un RSAT hecho de cero: nueve consolas con el
 mismo lenguaje visual, sobre LDAP nativo, sin Windows y sin una máquina virtual en el medio.
 
 ![Las consolas de ADeep](docs/img/consolas.png)
@@ -17,6 +17,9 @@ mismo lenguaje visual, sobre LDAP nativo, sin Windows y sin una máquina virtual
 | **Administración de DFS** | Espacios de nombres (v1 y v2) y grupos de replicación DFS-R |
 | **DNS** | Zonas integradas en el directorio, directas e inversas, con alta, edición y baja de registros |
 | **DHCP** | Servidores autorizados en el directorio *(parcial — ver [Límites](#límites-conocidos))* |
+| **Editor LDAP** | Acceso crudo a cualquier contexto de nombres: dominio, configuración, esquema y particiones DNS |
+| **Directivas de grupo** | Directivas, dónde se aplica cada una, precedencia, herencia y estado |
+| **Certificados** | Entidades emisoras, plantillas y revisión de seguridad (ESC1, ESC2, ESC3, ESC9) |
 
 Cada consola abre en su propia ventana, como los complementos de MMC, pero **todas comparten
 proceso y una sola sesión LDAP**: te autenticás una vez.
@@ -33,6 +36,9 @@ chmod +x ADeep-*-x86_64.AppImage
 ./ADeep-*-x86_64.AppImage --console=dfs      # DFS
 ./ADeep-*-x86_64.AppImage --console=dns      # DNS
 ./ADeep-*-x86_64.AppImage --console=dhcp     # DHCP
+./ADeep-*-x86_64.AppImage --console=ldap     # Editor LDAP
+./ADeep-*-x86_64.AppImage --console=gpo      # Directivas de grupo
+./ADeep-*-x86_64.AppImage --console=adcs     # Certificados
 ```
 
 Desde cualquier consola, el menú **Consolas** (o el botón de la punta derecha de la barra de
@@ -66,6 +72,15 @@ Para tenerlas en el menú del escritorio, bajá los `.desktop`, los `.png` y
 ### Administración de DFS
 ![DFS](docs/img/dfs.png)
 
+### Directivas de grupo
+![Directivas de grupo](docs/img/gpo.png)
+
+### Certificados
+![Certificados](docs/img/adcs.png)
+
+### Editor LDAP
+![Editor LDAP](docs/img/ldap.png)
+
 ### Dominios y confianzas
 ![Dominios y confianzas](docs/img/trusts.png)
 
@@ -79,13 +94,15 @@ dependencia de runtime. Todo el trabajo sucio está resuelto a mano en el proces
 - **`dnsRecord`** — códec de registros DNS (MS-DNSP), A/AAAA/NS/CNAME/SOA/PTR/MX/TXT/SRV.
 - **`pKT`** — parser del blob de metadatos de los espacios de nombres DFS v1 (MS-DFSNM).
 - **`schedule`** — bitmap semanal de 7×24 de vínculos, conexiones y DFS-R.
+- **`gPLink`** — vínculos de directivas de grupo, que se guardan al revés de la precedencia.
+- **`msDS-TrustForestTrustInfo`** — espacios de nombres de una confianza de bosque.
 - SIDs, GUIDs, FILETIME, DNs, `userAccountControl`, `groupType` y compañía.
 
 ```
 src/
   main/          proceso principal: LDAP y una carpeta por consola
     ldap/        conexión, encoding, SDDL, controles, filtros binarios
-    aduc… dns/   operaciones de cada consola
+    aduc… adcs/  operaciones de cada consola
   preload/       contextBridge → window.adeep, todo devuelve AppResult<T>
   renderer/      una página y un punto de entrada por consola
     shell/       ConsoleShell, SimpleTree, DetailList, ScheduleEditor
@@ -109,8 +126,8 @@ El proyecto trae arneses que corren la aplicación de verdad contra un dominio r
 perfil guardado. **Son de sólo lectura**, para poder correrlos sin riesgo:
 
 ```sh
-npm run validate     # 46 verificaciones de sólo lectura contra el DC del perfil
-npm run uitest       # abre las seis consolas, conecta y captura pantalla
+npm run validate     # 56 verificaciones de sólo lectura contra el DC del perfil
+npm run uitest       # abre las nueve consolas, conecta y captura pantalla
 
 npx electron out/main/uitest-audit.js --no-sandbox   # recorre todos los ítems de menú
 npx electron out/main/uitest-switch.js --no-sandbox  # verifica el cambio de consola
@@ -118,7 +135,8 @@ npx electron out/main/uitest-switch.js --no-sandbox  # verifica el cambio de con
 
 `validate` no se limita a que las funciones no exploten: reconstruye lo que lee y compara
 contra el original. El round-trip del descriptor de seguridad se verificó sobre los 14 848
-objetos de un dominio real, y el códec DNS reconstruyó 726 registros byte a byte.
+objetos de un dominio real, el códec DNS reconstruyó 726 registros byte a byte y los 57
+atributos `gPLink` del dominio volvieron idénticos.
 
 Vale la pena: estos arneses encontraron, entre otras cosas, que los filtros LDAP con valores
 binarios se corrompían en silencio (todo byte ≥ 0x80 se convertía en dos), que los submenús no
@@ -138,10 +156,15 @@ Vale más decirlo que descubrirlo en producción:
   (WinRM, MS-DHCPM por RPC, o la API REST de Kea si es Linux). Todavía no está decidido cuál.
 - **Crear confianzas** requiere LSA RPC y no se puede por LDAP. Se administran las que ya existen.
 - **Crear espacios de nombres DFS** requiere MS-DFSNM por RPC. Se administran los que ya existen.
+- **El contenido de las directivas de grupo** vive en SYSVOL, no en el directorio. Desde acá se
+  administra dónde se aplican, en qué orden y con qué estado, no qué configuran.
+- **Emitir o revocar certificados** es MS-ICPR por RPC. Se administran las plantillas, sus
+  permisos y qué entidad emisora publica cada una.
 - Los servidores DNS y DFS releen su configuración de AD por sondeo, así que un cambio puede
   tardar en verse.
 
-El plan por fases y las decisiones de arquitectura están en [`docs/ROADMAP.md`](docs/ROADMAP.md).
+El plan por fases y las decisiones de arquitectura están en [`docs/ROADMAP.md`](docs/ROADMAP.md);
+el historial de lo que se fue haciendo, en [`docs/BITACORA.md`](docs/BITACORA.md).
 
 ## Licencia
 

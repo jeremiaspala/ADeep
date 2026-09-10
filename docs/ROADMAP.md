@@ -2,7 +2,8 @@
 
 > Documento de continuidad. Si retomás la sesión sin contexto previo, **leé esto primero**
 > y seguí por la fase que esté marcada como en curso.
-> Última actualización: 2026-09-10 (seis consolas, v0.4.0 publicada).
+> Última actualización: 2026-09-10 (nueve consolas, v0.5.0 publicada).
+> El historial de lo hecho está en [`BITACORA.md`](BITACORA.md).
 
 **El objetivo declarado es rehacer RSAT para Linux desde cero**: una aplicación por
 complemento de MMC, todas con el mismo lenguaje visual y sobre la misma base LDAP.
@@ -349,6 +350,27 @@ funcionan.
    `Promise.all`.
 4. Las ventanas de la app empaquetada no tenían ícono: se referenciaba un archivo que no
    estaba incluido en el asar.
+
+### Fase 6 — Editor LDAP, Directivas de grupo y Certificados  ✅ terminada
+
+- [x] **Editor LDAP**: contextos de nombres del rootDSE, navegación cruda, creación de objetos
+      con las clases que el esquema admite bajo cada contenedor, editor de atributos y de ACLs.
+- [x] **Directivas de grupo**: las directivas del dominio, ámbitos con vínculos, precedencia,
+      exigido, vínculos deshabilitados, bloqueo de herencia y estado de la directiva.
+      **Ojo:** `gPLink` guarda los vínculos al revés de la precedencia.
+- [x] **Certificados**: entidades emisoras, plantillas, almacenes de confianza y revisión de
+      seguridad. Las plantillas que ninguna CA publica se degradan a observación menor.
+- [x] **Confiar en la CA del dominio**: fija los certificados de CA del directorio en el perfil
+      y activa la validación de LDAPS.
+- [ ] Pendiente: permisos de inscripción por plantilla en una vista propia (hoy se ven en la
+      pestaña de seguridad), filtrado de seguridad de GPO, y GPMC sobre SYSVOL.
+
+### Próximas candidatas
+
+Por valor sobre esfuerzo, todas puro LDAP: **LAPS** (`ms-Mcs-AdmPwd`, `msLAPS-Password`),
+**BitLocker** (`msFVE-RecoveryInformation`), **directivas de contraseña específicas** (PSO),
+**papelera de AD**, **editor de esquema**, **estado de replicación** (`repsFrom`/`repsTo`) y el
+asistente de **delegar control**, cuyo backend ya está hecho.
 
 ## 4. Convenciones del proyecto
 
