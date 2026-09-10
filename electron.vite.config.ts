@@ -11,7 +11,10 @@ export default defineConfig({
           index: resolve(__dirname, 'src/main/index.ts'),
           // Arnés de validación de sólo lectura: `npm run validate`.
           validate: resolve(__dirname, 'src/main/validate.ts'),
-          uitest: resolve(__dirname, 'src/main/uitest.ts')
+          uitest: resolve(__dirname, 'src/main/uitest.ts'),
+          'uitest-menu': resolve(__dirname, 'src/main/uitest-menu.ts'),
+          'uitest-audit': resolve(__dirname, 'src/main/uitest-audit.ts'),
+          'uitest-export': resolve(__dirname, 'src/main/uitest-export.ts')
         }
       }
     }

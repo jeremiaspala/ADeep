@@ -116,7 +116,11 @@ export function MenuPopup({
 
   useEffect(() => {
     const onDown = (e: MouseEvent): void => {
-      if (!ref.current?.contains(e.target as Node)) onClose()
+      // Los submenús viven en otro portal: si sólo mirásemos este popup, el
+      // mousedown sobre un ítem de submenú cerraría el menú y desmontaría el
+      // elemento antes de que llegara el click, y el onSelect nunca corría.
+      if ((e.target as Element | null)?.closest?.('.menu-pop')) return
+      onClose()
     }
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose()
