@@ -104,18 +104,21 @@
   background: var(--accent-soft);
   color: var(--accent-text);
 }
-.toolbar .search {
+.search {
   position: relative;
   width: 260px;
+  flex: 0 0 auto;
+}
+.toolbar .search {
   margin-left: auto;
 }
-.toolbar .search input {
+.search input {
   height: 28px;
   padding-left: 29px;
   border-radius: 14px;
   background: var(--bg-elev);
 }
-.toolbar .search svg {
+.search svg {
   position: absolute;
   left: 9px;
   top: 50%;
