@@ -8,10 +8,13 @@ import SimpleTree, { type TreeItem } from '../../shell/SimpleTree'
 import DetailList from '../../shell/DetailList'
 import { Modal, MenuPopup, useConfirm, type MenuItemDef } from '../../components/ui'
 import { report, useApp } from '../../store'
-import { fmtDate } from '../../lib/format'
+import { fmtDate, parentDN } from '../../lib/format'
 
 const LINK_DISABLED = 0x1
 const LINK_ENFORCED = 0x2
+
+/** El dominio tiene id fijo para poder expandirlo antes de que carguen los datos. */
+const idDeAmbito = (s: GpoScope): string => (s.type === 'domain' ? 'dominio' : s.dn)
 
 type Vista =
   | { t: 'gpos' }
@@ -47,32 +50,68 @@ export default function GpoConsole(): JSX.Element {
 
   const onSession = useCallback((_i: SessionInfo) => { void cargar() }, [cargar])
 
-  /** Los ámbitos con vínculos primero: es lo que uno viene a mirar. */
-  const conVinculos = useMemo(() => scopes.filter((s) => s.links.length || s.blockInheritance), [scopes])
+  const tree = useMemo<TreeItem[]>(() => {
+    const dominio = scopes.find((s) => s.type === 'domain')
+    const ous = scopes.filter((s) => s.type === 'ou')
+    const sitios = scopes.filter((s) => s.type === 'site')
 
-  const tree = useMemo<TreeItem[]>(() => [
-    {
-      id: 'raiz',
-      label: 'Directivas de grupo',
-      kind: 'domain',
-      children: [
-        { id: 'gpos', label: 'Objetos de directiva', kind: 'container', badge: String(gpos.length) },
-        {
-          id: 'ambitos',
-          label: 'Dónde se aplican',
-          kind: 'ou',
-          badge: String(conVinculos.length),
-          children: conVinculos.map((s) => ({
-            id: s.dn,
-            label: s.name,
-            kind: s.type === 'domain' ? 'domain' : s.type === 'site' ? 'site' : 'ou',
-            badge: s.blockInheritance ? `${s.links.length} ⃠` : String(s.links.length)
-          }))
-        },
-        { id: 'wmi', label: 'Filtros WMI', kind: 'container', badge: String(wmi.length) }
-      ]
+    const nodo = (s: GpoScope): TreeItem => ({
+      id: idDeAmbito(s),
+      label: s.name,
+      kind: s.type === 'domain' ? 'domain' : s.type === 'site' ? 'site' : 'ou',
+      badge: s.blockInheritance
+        ? `${s.links.length} ⃠`
+        : s.links.length
+          ? String(s.links.length)
+          : undefined,
+      data: s,
+      children: []
+    })
+
+    const porDN = new Map(ous.map((s) => [s.dn.toLowerCase(), nodo(s)] as const))
+    const sueltas: TreeItem[] = []
+    for (const s of ous) {
+      // El padre puede no ser una OU (hay contenedores intermedios): se cuelga
+      // del ancestro más cercano que sí esté en el árbol.
+      let p = parentDN(s.dn)
+      let padre: TreeItem | undefined
+      while (p && !padre) {
+        padre = porDN.get(p.toLowerCase())
+        if (!padre) p = parentDN(p)
+      }
+      ;(padre?.children ?? sueltas).push(porDN.get(s.dn.toLowerCase())!)
     }
-  ], [gpos, conVinculos, wmi])
+
+    const ordenar = (list: TreeItem[]): TreeItem[] => {
+      list.sort((a, b) => a.label.localeCompare(b.label, 'es'))
+      for (const n of list) if (n.children?.length) ordenar(n.children)
+      return list
+    }
+
+    const raizDominio: TreeItem = dominio
+      ? { ...nodo(dominio), children: ordenar(sueltas) }
+      : { id: 'dominio', label: 'Dominio', kind: 'domain', children: ordenar(sueltas) }
+
+    return [
+      {
+        id: 'raiz',
+        label: 'Directivas de grupo',
+        kind: 'domain',
+        children: [
+          raizDominio,
+          {
+            id: 'sitios',
+            label: 'Sitios',
+            kind: 'container',
+            badge: String(sitios.length),
+            children: ordenar(sitios.map(nodo))
+          },
+          { id: 'gpos', label: 'Objetos de directiva', kind: 'container', badge: String(gpos.length) },
+          { id: 'wmi', label: 'Filtros WMI', kind: 'container', badge: String(wmi.length) }
+        ]
+      }
+    ]
+  }, [gpos, scopes, wmi])
 
   const recargarYVer = async (scopeDN?: string): Promise<void> => {
     await cargar()
@@ -281,7 +320,7 @@ export default function GpoConsole(): JSX.Element {
                     {vinculada.map((s) => {
                       const l = s.links.find((x) => x.gpoDN.toLowerCase() === g.dn.toLowerCase())!
                       return (
-                        <tr key={s.dn} onClick={() => { setVista({ t: 'scope', scope: s }); setSelectedId(s.dn) }}>
+                        <tr key={s.dn} onClick={() => { setVista({ t: 'scope', scope: s }); setSelectedId(idDeAmbito(s)) }}>
                           <td>{s.name}</td>
                           <td>{s.type === 'domain' ? 'Dominio' : s.type === 'site' ? 'Sitio' : 'OU'}</td>
                           <td>
@@ -359,13 +398,12 @@ export default function GpoConsole(): JSX.Element {
           <SimpleTree
             items={tree}
             selectedId={selectedId}
-            defaultExpanded={['raiz', 'ambitos']}
+            defaultExpanded={['raiz', 'dominio', 'sitios']}
             onSelect={(item) => {
               setSelectedId(item.id)
               if (item.id === 'gpos') return setVista({ t: 'gpos' })
               if (item.id === 'wmi') return setVista({ t: 'wmi' })
-              const s = scopes.find((x) => x.dn === item.id)
-              if (s) setVista({ t: 'scope', scope: s })
+              if (item.data) setVista({ t: 'scope', scope: item.data as GpoScope })
             }}
           />
         }
