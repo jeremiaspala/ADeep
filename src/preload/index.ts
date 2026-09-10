@@ -179,6 +179,8 @@ const api = {
       call<string>('sites.createConnection', toNtdsDN, fromNtdsDN, name),
     setConnectionEnabled: (dn: string, enabled: boolean) =>
       call<boolean>('sites.setConnectionEnabled', dn, enabled),
+    setConnectionSchedule: (dn: string, schedule: boolean[] | null) =>
+      call<boolean>('sites.setConnectionSchedule', dn, schedule),
     deleteConnection: (dn: string) => call<boolean>('sites.deleteConnection', dn),
     setKcc: (siteDN: string, intraOff: boolean, interOff: boolean) =>
       call<boolean>('sites.setKcc', siteDN, intraOff, interOff),

@@ -62,6 +62,10 @@ export function registerConsoleIpc(handle: HandleFn, requireConn: () => AdConnec
     await sites.setConnectionEnabled(requireConn(), dn, enabled)
     return true
   })
+  handle('sites.setConnectionSchedule', async (dn: string, schedule: boolean[] | null) => {
+    await sites.setConnectionSchedule(requireConn(), dn, schedule)
+    return true
+  })
   handle('sites.deleteConnection', async (dn: string) => {
     await requireConn().delete(dn)
     return true

@@ -415,6 +415,18 @@ export async function createConnection(
   return dn
 }
 
+export async function setConnectionSchedule(
+  conn: AdConnection,
+  dn: string,
+  schedule: boolean[] | null
+): Promise<void> {
+  await conn.modify(dn, [
+    schedule
+      ? { op: 'replace', attribute: 'schedule', values: [buildSchedule(schedule)] }
+      : { op: 'delete', attribute: 'schedule', values: [] }
+  ])
+}
+
 export async function setConnectionEnabled(conn: AdConnection, dn: string, enabled: boolean): Promise<void> {
   await conn.modify(dn, [
     { op: 'replace', attribute: 'enabledConnection', values: [enabled ? 'TRUE' : 'FALSE'] }

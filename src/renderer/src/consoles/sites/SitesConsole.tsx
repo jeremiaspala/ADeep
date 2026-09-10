@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState, type JSX } from 'react'
 import {
   Network, Plus, Trash2, Server, Globe, Link2, CalendarClock, Zap, RefreshCw, Settings2
 } from 'lucide-react'
+
 import type {
   DsaServerInfo, SessionInfo, SiteInfo, SiteLinkInfo, SubnetInfo
 } from '@shared/types'
@@ -156,20 +157,6 @@ export default function SitesConsole(): JSX.Element {
     if (report(await window.adeep.sites.delete(site.dn), 'Sitio eliminado') !== undefined) await load()
   }
 
-  const replicateNow = async (server: DsaServerInfo): Promise<void> => {
-    const ok = await confirm({
-      title: 'Forzar replicación',
-      message: `Pedir a ${server.name} que replique el contexto del dominio.`,
-      detail:
-        'ADeep escribe replicateSingleObject en el rootDSE. Es una sincronización puntual, ' +
-        'no equivale al "Replicar ahora" completo de la consola de Windows, que usa DRSUAPI.',
-      confirmLabel: 'Replicar'
-    })
-    if (!ok) return
-    const res = await window.adeep.sites.rootDseOperation('doGarbageCollection', '1')
-    report(res, 'Solicitud enviada al controlador de dominio')
-  }
-
   /* ---------------- Menús contextuales ---------------- */
 
   const siteMenu = (site: SiteInfo): MenuItemDef[] => [
@@ -206,9 +193,7 @@ export default function SitesConsole(): JSX.Element {
       id: 'gc', label: 'Catálogo global', checked: server.isGC,
       onSelect: () => void setGC(server, !server.isGC)
     },
-    { id: 'move', label: 'Mover a otro sitio…', onSelect: () => setDialog({ t: 'moveServer', server }) },
-    { id: 's1', separator: true },
-    { id: 'repl', label: 'Forzar replicación…', icon: <Zap size={15} />, onSelect: () => void replicateNow(server) }
+    { id: 'move', label: 'Mover a otro sitio…', onSelect: () => setDialog({ t: 'moveServer', server }) }
   ]
 
   /* ---------------- Panel derecho ---------------- */
@@ -319,9 +304,9 @@ export default function SitesConsole(): JSX.Element {
                               title: `Programación — ${c.fromServerName} → ${server.name}`,
                               initial: c.schedule,
                               save: async (s) => {
+                                const res = await window.adeep.sites.setConnectionSchedule(c.dn, s)
                                 setDialog(null)
-                                toast('info', 'La programación de conexiones se edita desde el vínculo del sitio.')
-                                void s
+                                if (report(res, 'Programación guardada') !== undefined) await load()
                               }
                             })}
                           >
@@ -441,14 +426,15 @@ export default function SitesConsole(): JSX.Element {
             { id: 'newlink', label: 'Nuevo vínculo de sitios…', icon: <Link2 size={15} />, onSelect: () => setDialog({ t: 'newLink' }) },
             { id: 's1', separator: true },
             {
-              id: 'kccnow', label: 'Comprobar la topología ahora (KCC)', icon: <RefreshCw size={15} />,
+              id: 'kccnow', label: 'Recalcular la topología del KCC', icon: <RefreshCw size={15} />,
+              title: 'Escribe recalcHierarchy en el rootDSE del DC conectado',
               onSelect: () => void (async () => {
                 const res = await window.adeep.sites.rootDseOperation('recalcHierarchy', '1')
                 report(res, 'Solicitud enviada')
               })()
             },
             {
-              id: 'gc', label: 'Recolección de basura del DC', icon: <Zap size={15} />,
+              id: 'gc', label: 'Recolección de basura del DC conectado', icon: <Zap size={15} />,
               onSelect: () => void (async () => {
                 const res = await window.adeep.sites.rootDseOperation('doGarbageCollection', '1')
                 report(res, 'Solicitud enviada')

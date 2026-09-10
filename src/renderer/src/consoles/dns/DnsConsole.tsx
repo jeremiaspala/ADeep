@@ -62,6 +62,27 @@ export default function DnsConsole(): JSX.Element {
     if (s.ok) setServers(s.data ?? [])
   }, [])
 
+  /**
+   * Tras escribir hay que recargar las zonas además de los registros: el árbol y
+   * la lista muestran la cantidad de nombres, que si no queda vieja.
+   */
+  const recargarTodo = useCallback(async (z: DnsZone): Promise<void> => {
+    const [zs, n, d] = await Promise.all([
+      window.adeep.dns.zones(),
+      window.adeep.dns.nodes(z.dn),
+      window.adeep.dns.zoneDetails(z.dn)
+    ])
+    if (zs.ok) {
+      const lista = zs.data ?? []
+      setZones(lista)
+      // La zona seleccionada también trae contadores nuevos.
+      const actual = lista.find((x) => x.dn === z.dn)
+      if (actual) setZona(actual)
+    }
+    if (report(n) !== undefined) setNodes(n.data ?? [])
+    setDetails(d.ok ? d.data ?? null : null)
+  }, [])
+
   const abrirZona = useCallback(async (z: DnsZone): Promise<void> => {
     setZona(z)
     setSelected(undefined)
@@ -123,7 +144,7 @@ export default function DnsConsole(): JSX.Element {
     })
     if (!ok) return
     const res = await window.adeep.dns.deleteRecord(fila.node.dn, fila.record.raw)
-    if (report(res, 'Registro eliminado') !== undefined && zona) await abrirZona(zona)
+    if (report(res, 'Registro eliminado') !== undefined && zona) await recargarTodo(zona)
   }
 
   const menuFila = (fila: Fila): MenuItemDef[] => [
@@ -265,7 +286,7 @@ export default function DnsConsole(): JSX.Element {
             const res = await window.adeep.dns.addRecord(dialog.zone.dn, nodeName, input)
             if (report(res, 'Registro creado') !== undefined) {
               setDialog(null)
-              await abrirZona(dialog.zone)
+              await recargarTodo(dialog.zone)
             }
           }}
         />
@@ -287,7 +308,7 @@ export default function DnsConsole(): JSX.Element {
             )
             if (report(res, 'Registro actualizado') !== undefined) {
               setDialog(null)
-              await abrirZona(zona)
+              await recargarTodo(zona)
             }
           }}
         />

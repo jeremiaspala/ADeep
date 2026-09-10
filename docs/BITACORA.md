@@ -138,6 +138,43 @@ que había se perdió y hubo que volver a escribirla una vez.
 Se agregó «confiar» a la lista negra del arnés y la acción pasó a pedir confirmación,
 mostrando qué CAs va a fijar.
 
+### 11. «Cambié el nombre y no se modificó»
+
+Reporte de Jeremías, y la primera escritura que se probó contra el dominio real. **La escritura
+había funcionado**: `displayName` decía «Jeremias Palazzesi» con `whenChanged` de esa misma
+hora. Lo que no funcionaba era la interfaz: el árbol y la lista muestran el `cn`, no el
+`displayName`, así que el cambio no se veía en ningún lado.
+
+Debajo había dos huecos reales:
+
+- `givenName`, `initials` y `sn` no eran editables en ninguna parte, sólo en el alta.
+- `obj.renameUser` existía en el backend desde el principio y **no tenía interfaz**: F2
+  renombraba únicamente el RDN, dejando los demás nombres viejos.
+
+Se agregaron los campos a la pestaña General y un diálogo de cambio de nombre como el de
+Windows: nombre, iniciales, apellido, CN, nombre para mostrar, cuenta y UPN, con el CN y el
+nombre para mostrar rearmándose solos mientras no se los toque. F2 y el menú contextual abren
+ese diálogo para usuarios y el de siempre para el resto.
+
+### 12. La misma clase de bug en el resto de las consolas
+
+A pedido de Jeremías se revisaron los 60 puntos de escritura de las nueve consolas buscando lo
+mismo: **la escritura anda pero la vista queda vieja**. Aparecieron tres, y dos eran peores que
+el original:
+
+- **DNS**: al agregar o borrar registros se recargaban los registros pero no las zonas, así que
+  los contadores del árbol y de la lista quedaban viejos.
+- **Editor LDAP**: al crear o borrar se refrescaba la lista pero no la rama del árbol; el objeto
+  nuevo no aparecía hasta reiniciar la consola.
+- **Sitios**: el editor de programación de una conexión se abría, dejaba editar… y **descartaba
+  los cambios** con un aviso. Ahora guarda de verdad (`sites.setConnectionSchedule`).
+
+Y una acción que mentía: «Forzar replicación» en el menú de un servidor decía que replicaba pero
+disparaba la recolección de basura. Se eliminó, y las dos operaciones sobre rootDSE que sí
+funcionan quedaron con nombres que dicen lo que hacen.
+
+Después de esto: 170 ítems de menú recorridos, **0 sin efecto**.
+
 ### Lo que quedó pendiente
 
 - **Las escrituras nunca se probaron contra un dominio real.** Las lecturas sí, exhaustivamente.
@@ -154,8 +191,8 @@ mostrando qué CAs va a fijar.
 |---|---|
 | Consolas | 9 |
 | Verificaciones de sólo lectura | 56, todas en verde |
-| Ítems de menú auditados | 171 |
+| Ítems de menú auditados | 170, todos con efecto |
 | Objetos con round-trip de descriptor de seguridad verificado | 14 848 |
 | Registros DNS reconstruidos byte a byte | 726 |
 | Atributos `gPLink` reconstruidos | 57 |
-| Bugs encontrados por los arneses | 12 |
+| Bugs encontrados por los arneses | 16 |

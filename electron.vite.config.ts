@@ -18,7 +18,8 @@ export default defineConfig({
           'uitest-export': resolve(__dirname, 'src/main/uitest-export.ts'),
           'uitest-about': resolve(__dirname, 'src/main/uitest-about.ts'),
           'uitest-switch': resolve(__dirname, 'src/main/uitest-switch.ts'),
-          'uitest-shots': resolve(__dirname, 'src/main/uitest-shots.ts')
+          'uitest-shots': resolve(__dirname, 'src/main/uitest-shots.ts'),
+          'uitest-rename': resolve(__dirname, 'src/main/uitest-rename.ts')
         }
       }
     }

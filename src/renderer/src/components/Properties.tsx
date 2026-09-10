@@ -17,6 +17,9 @@ import { unlock as unlockAccounts } from '../lib/objectActions'
 /** Campos de texto editables por pestaña. */
 const GENERAL_FIELDS: Record<string, { attr: string; label: string }[]> = {
   person: [
+    { attr: 'givenName', label: 'Nombre' },
+    { attr: 'initials', label: 'Iniciales' },
+    { attr: 'sn', label: 'Apellido' },
     { attr: 'displayName', label: 'Nombre para mostrar' },
     { attr: 'description', label: 'Descripción' },
     { attr: 'physicalDeliveryOfficeName', label: 'Oficina' },
@@ -93,6 +96,7 @@ export default function PropertiesDialog({
   const [protect0, setProtect0] = useState<boolean>()
   const [secDirty, setSecDirty] = useState(false)
   const [managerPicker, setManagerPicker] = useState(false)
+  const [renaming, setRenaming] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const attr = (name: string): string => {
@@ -263,11 +267,18 @@ export default function PropertiesDialog({
         <div style={{ overflow: 'auto', minHeight: 0, flex: 1 }}>
           {tab === 'general' && (
             <div className="col" style={{ gap: 10, padding: 16 }}>
-              <div className="grid-2">
-                <Field label="Nombre">
+              <div className="row" style={{ gap: 10, alignItems: 'flex-end' }}>
+                <Field
+                  label="Nombre del objeto"
+                  hint="Es el CN: lo que se ve en el árbol y en la lista."
+                  style={{ flex: 1 }}
+                >
                   <input type="text" value={entry.name} disabled />
                 </Field>
-                <Field label="Clase de objeto">
+                {isPerson && (
+                  <button className="btn" onClick={() => setRenaming(true)}>Cambiar nombre…</button>
+                )}
+                <Field label="Clase de objeto" style={{ flex: 1 }}>
                   <input type="text" value={entry.objectClass.slice(-1)[0] ?? ''} disabled />
                 </Field>
               </div>
@@ -441,6 +452,14 @@ export default function PropertiesDialog({
         </div>
       )}
 
+      {renaming && (
+        <RenameUserDialog
+          dn={dn}
+          onClose={() => setRenaming(false)}
+          onRenamed={() => { setRenaming(false); onChanged(); void load() }}
+        />
+      )}
+
       {managerPicker && (
         <Picker
           title="Seleccionar administrador"
@@ -450,6 +469,120 @@ export default function PropertiesDialog({
           onConfirm={(entries) => { setAttr('manager', entries[0]?.dn ?? ''); setManagerPicker(false) }}
         />
       )}
+    </Modal>
+  )
+}
+
+/**
+ * Renombrar de verdad: además del CN (que es el RDN del objeto) actualiza los
+ * atributos que en Windows cambian juntos. Cambiar sólo displayName no cambia lo
+ * que se ve en el árbol ni en la lista, que muestran el CN.
+ */
+export function RenameUserDialog({
+  dn, onClose, onRenamed
+}: {
+  dn: string
+  onClose: () => void
+  onRenamed: () => void
+}): JSX.Element {
+  const [entry, setEntry] = useState<DirEntry>()
+  const [givenName, setGivenName] = useState('')
+  const [initials, setInitials] = useState('')
+  const [sn, setSn] = useState('')
+  const [cn, setCn] = useState('')
+  const [displayName, setDisplayName] = useState('')
+  const [sam, setSam] = useState('')
+  const [upn, setUpn] = useState('')
+  const [tocado, setTocado] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  // El objeto de la lista no trae givenName ni sn: se lee completo.
+  useEffect(() => {
+    void (async () => {
+      const res = await window.adeep.dir.entry(dn)
+      const data = report(res)
+      if (!data) { onClose(); return }
+      const attrOf = (name: string): string => {
+        const a = data.attrs
+        if (!a) return ''
+        const key = a[name] ? name : Object.keys(a).find((k) => k.toLowerCase() === name.toLowerCase())
+        return key ? (a[key] ?? []).join('; ') : ''
+      }
+      setEntry(data)
+      setGivenName(attrOf('givenName'))
+      setInitials(attrOf('initials'))
+      setSn(attrOf('sn'))
+      setCn(data.name)
+      setDisplayName(attrOf('displayName'))
+      setSam(attrOf('sAMAccountName'))
+      setUpn(attrOf('userPrincipalName'))
+      setTocado(true)
+    })()
+  }, [dn])
+
+  // Como en Windows: al escribir nombre o apellido se rearman el CN y el
+  // nombre para mostrar, salvo que el usuario los haya editado a mano.
+  useEffect(() => {
+    if (tocado) return
+    const completo = [givenName, initials, sn].map((x) => x.trim()).filter(Boolean).join(' ')
+    if (completo) { setCn(completo); setDisplayName(completo) }
+  }, [givenName, initials, sn, tocado])
+
+  const guardar = async (): Promise<void> => {
+    setBusy(true)
+    const res = await window.adeep.obj.renameUser(dn, {
+      cn: cn.trim(),
+      givenName: givenName.trim(),
+      initials: initials.trim(),
+      sn: sn.trim(),
+      displayName: displayName.trim(),
+      sAMAccountName: sam.trim() || undefined,
+      userPrincipalName: upn.trim() || undefined
+    })
+    setBusy(false)
+    if (report(res, 'Usuario renombrado') !== undefined) onRenamed()
+  }
+
+  return (
+    <Modal
+      title="Cambiar nombre"
+      subtitle={entry?.name ?? dn}
+      icon={<KindIcon kind={entry?.kind ?? 'user'} size={18} />}
+      size="wide"
+      onClose={onClose}
+      footer={
+        <>
+          <div className="spacer" style={{ flex: 1 }} />
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn primary" disabled={!entry || !cn.trim() || busy} onClick={() => void guardar()}>
+            {busy && <Spinner size={14} />} Guardar
+          </button>
+        </>
+      }
+    >
+      <div className="col" style={{ gap: 10 }}>
+        <div className="grid-3">
+          <Text label="Nombre" value={givenName} onChange={setGivenName} autoFocus />
+          <Text label="Iniciales" value={initials} onChange={setInitials} maxLength={6} />
+          <Text label="Apellido" value={sn} onChange={setSn} />
+        </div>
+        <Text
+          label="Nombre completo (CN)"
+          value={cn}
+          onChange={(v) => { setCn(v); setTocado(true) }}
+          hint="Renombra el objeto en el directorio: es lo que se ve en el árbol y en la lista."
+          error={!cn.trim() ? 'Obligatorio' : undefined}
+        />
+        <Text label="Nombre para mostrar" value={displayName} onChange={(v) => { setDisplayName(v); setTocado(true) }} />
+        <div className="grid-2">
+          <Text label="Nombre de inicio de sesión" value={sam} onChange={setSam} maxLength={20} />
+          <Text label="userPrincipalName" value={upn} onChange={setUpn} />
+        </div>
+        <div className="hint">
+          Cambiar el nombre de inicio de sesión afecta el acceso del usuario: las sesiones
+          abiertas y lo que dependa del nombre viejo pueden dejar de funcionar.
+        </div>
+      </div>
     </Modal>
   )
 }

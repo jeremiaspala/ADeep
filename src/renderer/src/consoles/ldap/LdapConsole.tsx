@@ -66,6 +66,16 @@ export default function LdapConsole(): JSX.Element {
     })))
   }, [])
 
+  /**
+   * Después de crear o borrar hay que refrescar la lista **y** la rama del árbol:
+   * si no, el objeto nuevo no aparece hasta reiniciar la consola.
+   */
+  const refrescarNodo = useCallback(async (dn: string): Promise<void> => {
+    await abrir(dn)
+    const rama = buscar(arbol, dn)
+    if (rama?.abierta) await expandir(dn)
+  }, [abrir, expandir, arbol])
+
   const onSession = useCallback((_i: SessionInfo) => { void cargarContextos() }, [cargarContextos])
 
   const filas = useMemo(() => {
@@ -96,7 +106,7 @@ export default function LdapConsole(): JSX.Element {
         })
         if (!ok) return
         const res = await window.adeep.obj.delete([n.dn], false)
-        if (report(res, 'Objeto eliminado') !== undefined && seleccion) await abrir(seleccion)
+        if (report(res, 'Objeto eliminado') !== undefined && seleccion) await refrescarNodo(seleccion)
       })()
     }
   ]
@@ -193,14 +203,14 @@ export default function LdapConsole(): JSX.Element {
       {ctx && <MenuPopup items={ctx.items} x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} />}
 
       {dialog?.t === 'props' && (
-        <ObjetoDialog dn={dialog.dn} onClose={() => setDialog(null)} onChanged={() => seleccion && void abrir(seleccion)} />
+        <ObjetoDialog dn={dialog.dn} onClose={() => setDialog(null)} onChanged={() => seleccion && void refrescarNodo(seleccion)} />
       )}
 
       {dialog?.t === 'nuevo' && (
         <NuevoObjetoDialog
           parentDN={dialog.parentDN}
           onClose={() => setDialog(null)}
-          onCreated={() => { setDialog(null); if (seleccion) void abrir(seleccion) }}
+          onCreated={() => { setDialog(null); if (seleccion) void refrescarNodo(seleccion) }}
         />
       )}
     </>
@@ -313,6 +323,15 @@ function NuevoObjetoDialog({
       </div>
     </Modal>
   )
+}
+
+function buscar(ramas: Rama[], dn: string): Rama | undefined {
+  for (const r of ramas) {
+    if (r.dn === dn) return r
+    const encontrada = r.hijos && buscar(r.hijos, dn)
+    if (encontrada) return encontrada
+  }
+  return undefined
 }
 
 function patch(ramas: Rama[], dn: string, fn: (r: Rama) => Rama): Rama[] {

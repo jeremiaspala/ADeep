@@ -12,7 +12,7 @@ import TreePane from './components/TreePane'
 import ListPane from './components/ListPane'
 import ConnectDialog from './components/ConnectDialog'
 import NewObjectDialog, { type NewObjectKind } from './components/NewObject'
-import PropertiesDialog from './components/Properties'
+import PropertiesDialog, { RenameUserDialog } from './components/Properties'
 import FindDialog from './components/FindDialog'
 import PreferencesDialog from './components/PreferencesDialog'
 import ColumnsDialog from './components/ColumnsDialog'
@@ -41,9 +41,20 @@ type Dialog =
   | { t: 'password'; dn: string; name: string }
   | { t: 'addToGroup'; dns: string[] }
   | { t: 'rename'; dn: string; name: string }
+  | { t: 'renameUser'; dn: string }
   | { t: 'about' }
 
 interface Ctx { items: MenuItemDef[]; x: number; y: number }
+
+/**
+ * Para usuarios se abre el diálogo completo: cambiar sólo el RDN deja el resto
+ * de los nombres viejos, que es justo lo que confunde después.
+ */
+function renameDialogFor(entry: DirEntry): Dialog {
+  return entry.kind === 'user' || entry.kind === 'inetOrgPerson'
+    ? { t: 'renameUser', dn: entry.dn }
+    : { t: 'rename', dn: entry.dn, name: entry.name }
+}
 
 export default function App(): JSX.Element {
   const session = useApp((s) => s.session)
@@ -179,7 +190,7 @@ export default function App(): JSX.Element {
 
       if (e.key === 'F5') { e.preventDefault(); void refresh() }
       else if (e.key === 'Delete' && sel.length) { e.preventDefault(); doDelete() }
-      else if (e.key === 'F2' && one) { e.preventDefault(); setDialog({ t: 'rename', dn: one.dn, name: one.name }) }
+      else if (e.key === 'F2' && one) { e.preventDefault(); setDialog(renameDialogFor(one)) }
       else if (e.key === 'Enter' && e.altKey && one) { e.preventDefault(); openProps(one.dn) }
       else if (ctrl && e.key.toLowerCase() === 'f') { e.preventDefault(); setDialog({ t: 'find' }) }
       else if (ctrl && e.key.toLowerCase() === 'x' && sel.length) {
@@ -274,7 +285,7 @@ export default function App(): JSX.Element {
       { id: 'delete', label: 'Eliminar', icon: <Trash2 size={15} />, shortcut: 'Supr', danger: true, onSelect: doDelete },
       {
         id: 'rename', label: 'Cambiar nombre', icon: <Pencil size={15} />, shortcut: 'F2', disabled: !single,
-        onSelect: () => single && setDialog({ t: 'rename', dn: single.dn, name: single.name })
+        onSelect: () => single && setDialog(renameDialogFor(single))
       },
       { id: 's5', separator: true },
       { id: 'copydn', label: 'Copiar DN', disabled: !single, onSelect: () => single && void copyText(single.dn, 'DN copiado') },
@@ -314,7 +325,7 @@ export default function App(): JSX.Element {
         { id: 's2', separator: true },
         { id: 'move', label: 'Mover…', icon: <MoveRight size={15} />, disabled: entry.kind === 'domain', onSelect: () => setDialog({ t: 'move', dns: [entry.dn] }) },
         { id: 'del', label: 'Eliminar', icon: <Trash2 size={15} />, danger: true, disabled: entry.kind === 'domain', onSelect: () => void deleteObjects([entry], confirm) },
-        { id: 'rename', label: 'Cambiar nombre', icon: <Pencil size={15} />, shortcut: 'F2', disabled: entry.kind === 'domain', onSelect: () => setDialog({ t: 'rename', dn: entry.dn, name: entry.name }) },
+        { id: 'rename', label: 'Cambiar nombre', icon: <Pencil size={15} />, shortcut: 'F2', disabled: entry.kind === 'domain', onSelect: () => setDialog(renameDialogFor(entry)) },
         { id: 's3', separator: true },
         { id: 'copydn', label: 'Copiar DN', onSelect: () => void copyText(entry.dn, 'DN copiado') },
         { id: 'sec', label: 'Seguridad…', icon: <ShieldCheck size={15} />, onSelect: () => openProps(entry.dn, 'security') },
@@ -589,6 +600,14 @@ export default function App(): JSX.Element {
           }}
         />
       )}
+      {dialog?.t === 'renameUser' && (
+        <RenameUserDialog
+          dn={dialog.dn}
+          onClose={() => setDialog(null)}
+          onRenamed={() => { setDialog(null); void refresh() }}
+        />
+      )}
+
       {dialog?.t === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
     </div>
   )
