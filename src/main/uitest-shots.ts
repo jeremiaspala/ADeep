@@ -66,7 +66,10 @@ async function main(): Promise<void> {
     ['trusts', 'trusts', ['Dominios del bosque']],
     ['dfs', 'dfs', ['Archivos']],
     ['dns', 'dns', ['ejemplo.local']],
-    ['dhcp', 'dhcp', []]
+    ['dhcp', 'dhcp', []],
+    ['ldap', 'ldap', ['Configuración']],
+    ['gpo', 'gpo', ['Dónde se aplican', 'Users']],
+    ['adcs', 'adcs', ['Plantillas']]
   ]
 
   for (const [id, nombre, navegacion] of pasos) {

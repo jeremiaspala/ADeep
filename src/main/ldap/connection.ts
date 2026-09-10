@@ -24,8 +24,10 @@ const BINARY_ATTRS = [
   'trustAuthOutgoing', 'supplementalCredentials', 'priorValue', 'securityIdentifier',
   'msDS-QuotaTrustee', 'wellKnownObjects', 'otherWellKnownObjects', 'schedule',
   'networkAddress', 'oMObjectClass', 'msDS-Site-Affinity', 'partialAttributeSet',
-  'msPKI-Enrollment-Flag', 'pKIExpirationPeriod', 'pKIOverlapPeriod', 'pKIKeyUsage',
-  'pKICriticalExtensions', 'pKIExtendedKeyUsage', 'pKIDefaultKeySpec', 'pKIEnrollmentAccess',
+  // Sólo los realmente binarios: msPKI-Enrollment-Flag es un entero y
+  // pKIExtendedKeyUsage / pKICriticalExtensions son listas de OIDs en texto.
+  'pKIExpirationPeriod', 'pKIOverlapPeriod', 'pKIKeyUsage', 'pKIEnrollmentAccess',
+  'cACertificate', 'crossCertificatePair', 'msPKI-Cert-Template-OID-binary',
   'terminalServer', 'msRADIUSFramedIPAddress', 'msRTCSIP-UserRoutingGroupId',
   // Sitios, confianzas y DFS.
   'invocationId', 'pKT', 'pKTGuid', 'msDS-TrustForestTrustInfo',
@@ -109,7 +111,9 @@ export class AdConnection {
   static async connect(profile: ConnectionProfile, password: string): Promise<AdConnection> {
     const tlsOptions = {
       rejectUnauthorized: !profile.insecureTLS,
-      servername: profile.host
+      servername: profile.host,
+      // Con la CA del dominio fijada no hace falta desactivar la validación.
+      ...(profile.caCertificates?.length ? { ca: profile.caCertificates } : {})
     }
     const client = new Client({
       url: AdConnection.url(profile),

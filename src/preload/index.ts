@@ -2,7 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppResult, AttributeValue, ConnectionProfile, CreateComputerInput, CreateContactInput,
   CreateGroupInput, CreateOUInput, CreateUserInput, DfsNamespace, DfsTarget, DfsrGroup,
-  DhcpState, DirEntry, DnsNode, DnsZone, DnsZoneDetails,
+  CertificateAuthority, CertificateTemplate, DhcpState, DirEntry, DnsNode, DnsZone,
+  DnsZoneDetails, GpoInfo, GpoScope, LdapBrowserNode, LdapContext, WmiFilter,
   DomainControllerInfo, DsaServerInfo, ForestInfo, FsmoRoles, GroupMembership,
   Modification, PartitionInfo, PasswordPolicy, Preferences, SavedQuery, SearchRequest,
   SearchResult, SecurityDescriptor, SessionInfo, SiteInfo, SiteLinkInfo, SubnetInfo,
@@ -237,6 +238,36 @@ const api = {
 
   dhcp: {
     state: () => call<DhcpState>('dhcp.state')
+  },
+
+  ldapb: {
+    contexts: () => call<LdapContext[]>('ldapb.contexts'),
+    children: (dn: string) => call<LdapBrowserNode[]>('ldapb.children', dn),
+    allowedClasses: (dn: string) => call<string[]>('ldapb.allowedClasses', dn),
+    create: (parentDN: string, rdnAttribute: string, rdnValue: string, objectClass: string) =>
+      call<string>('ldapb.create', parentDN, rdnAttribute, rdnValue, objectClass)
+  },
+
+  gpo: {
+    list: () => call<GpoInfo[]>('gpo.list'),
+    scopes: () => call<GpoScope[]>('gpo.scopes'),
+    wmiFilters: () => call<WmiFilter[]>('gpo.wmiFilters'),
+    link: (scopeDN: string, gpoDN: string) => call<boolean>('gpo.link', scopeDN, gpoDN),
+    unlink: (scopeDN: string, gpoDN: string) => call<boolean>('gpo.unlink', scopeDN, gpoDN),
+    setLinkOptions: (scopeDN: string, gpoDN: string, options: number) =>
+      call<boolean>('gpo.setLinkOptions', scopeDN, gpoDN, options),
+    moveLink: (scopeDN: string, gpoDN: string, direction: -1 | 1) =>
+      call<boolean>('gpo.moveLink', scopeDN, gpoDN, direction),
+    setBlockInheritance: (scopeDN: string, block: boolean) =>
+      call<boolean>('gpo.setBlockInheritance', scopeDN, block),
+    setStatus: (gpoDN: string, flags: number) => call<boolean>('gpo.setStatus', gpoDN, flags)
+  },
+
+  adcs: {
+    templates: () => call<CertificateTemplate[]>('adcs.templates'),
+    authorities: () => call<CertificateAuthority[]>('adcs.authorities'),
+    stores: () => call<{ store: string; label: string; certificates: number; dn: string }[]>('adcs.stores'),
+    caCertificates: () => call<{ name: string; store: string; pem: string }[]>('adcs.caCertificates')
   },
 
   theme: {

@@ -93,8 +93,14 @@ export async function saveProfile(profile: ConnectionProfile): Promise<Connectio
   const { password, ...clean } = profile
   if (i >= 0) s.profiles[i] = clean as ConnectionProfile
   else s.profiles.push(clean as ConnectionProfile)
-  if (profile.savePassword && password) await setSecret(profile.id, password)
-  else await deleteSecret(profile.id)
+  // Sólo se borra el secreto cuando el usuario apaga "guardar la contraseña".
+  // Antes, guardar un perfil sin incluir el password (que sessionInfo nunca
+  // devuelve) borraba la contraseña ya guardada.
+  if (profile.savePassword) {
+    if (password) await setSecret(profile.id, password)
+  } else {
+    await deleteSecret(profile.id)
+  }
   await persist()
   return getProfiles()
 }

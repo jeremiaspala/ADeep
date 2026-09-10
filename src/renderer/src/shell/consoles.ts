@@ -7,7 +7,10 @@ export const CONSOLE_LABELS: Record<string, string> = {
   trusts: 'Dominios y confianzas',
   dfs: 'Administración de DFS',
   dns: 'DNS',
-  dhcp: 'DHCP'
+  dhcp: 'DHCP',
+  ldap: 'Editor LDAP',
+  gpo: 'Directivas de grupo',
+  adcs: 'Certificados'
 }
 
 /**

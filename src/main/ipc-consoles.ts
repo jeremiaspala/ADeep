@@ -9,6 +9,9 @@ import * as trusts from './trusts/operations'
 import * as dfs from './dfs/operations'
 import * as dns from './dns/operations'
 import * as dhcp from './dhcp/operations'
+import * as browser from './ldapbrowser/operations'
+import * as gpo from './gpo/operations'
+import * as adcs from './adcs/operations'
 import type { DfsTarget } from '../shared/types'
 
 export type HandleFn = <A extends unknown[], R>(
@@ -175,4 +178,50 @@ export function registerConsoleIpc(handle: HandleFn, requireConn: () => AdConnec
   /* ---------------- DHCP ---------------- */
 
   handle('dhcp.state', async () => dhcp.getState(requireConn()))
+
+  /* ---------------- Navegador LDAP ---------------- */
+
+  handle('ldapb.contexts', () => browser.listContexts(requireConn()))
+  handle('ldapb.children', async (dn: string) => browser.listChildren(requireConn(), dn))
+  handle('ldapb.allowedClasses', async (dn: string) => browser.allowedChildClasses(requireConn(), dn))
+  handle('ldapb.create', async (
+    parentDN: string, rdnAttribute: string, rdnValue: string, objectClass: string
+  ) => browser.createObject(requireConn(), parentDN, rdnAttribute, rdnValue, objectClass))
+
+  /* ---------------- Directivas de grupo ---------------- */
+
+  handle('gpo.list', async () => gpo.listGpos(requireConn()))
+  handle('gpo.scopes', async () => gpo.listScopes(requireConn()))
+  handle('gpo.wmiFilters', async () => gpo.listWmiFilters(requireConn()))
+  handle('gpo.link', async (scopeDN: string, gpoDN: string) => {
+    await gpo.linkGpo(requireConn(), scopeDN, gpoDN)
+    return true
+  })
+  handle('gpo.unlink', async (scopeDN: string, gpoDN: string) => {
+    await gpo.unlinkGpo(requireConn(), scopeDN, gpoDN)
+    return true
+  })
+  handle('gpo.setLinkOptions', async (scopeDN: string, gpoDN: string, options: number) => {
+    await gpo.setLinkOptions(requireConn(), scopeDN, gpoDN, options)
+    return true
+  })
+  handle('gpo.moveLink', async (scopeDN: string, gpoDN: string, direction: -1 | 1) => {
+    await gpo.moveLink(requireConn(), scopeDN, gpoDN, direction)
+    return true
+  })
+  handle('gpo.setBlockInheritance', async (scopeDN: string, block: boolean) => {
+    await gpo.setBlockInheritance(requireConn(), scopeDN, block)
+    return true
+  })
+  handle('gpo.setStatus', async (gpoDN: string, flags: number) => {
+    await gpo.setGpoStatus(requireConn(), gpoDN, flags)
+    return true
+  })
+
+  /* ---------------- Certificados ---------------- */
+
+  handle('adcs.templates', async () => adcs.listTemplates(requireConn()))
+  handle('adcs.authorities', async () => adcs.listAuthorities(requireConn()))
+  handle('adcs.stores', async () => adcs.listTrustStores(requireConn()))
+  handle('adcs.caCertificates', async () => adcs.getCaCertificates(requireConn()))
 }

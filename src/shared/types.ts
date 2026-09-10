@@ -10,6 +10,8 @@ export interface ConnectionProfile {
   security: Security
   /** No verificar el certificado del DC (labs / CA interna no instalada). */
   insecureTLS: boolean
+  /** CAs de confianza en PEM, normalmente tomadas del propio directorio. */
+  caCertificates?: string[]
   /** userPrincipalName, DOMAIN\\user o DN completo. */
   bindDN: string
   baseDN: string
@@ -569,4 +571,115 @@ export interface DhcpState {
   servers: DhcpAuthorizedServer[]
   /** Equipos del dominio que publican el SPN del servicio DHCP. */
   candidates: { name: string; dnsHostName?: string; dn: string }[]
+}
+
+/* ---------------- Navegador LDAP ---------------- */
+
+export interface LdapContext {
+  dn: string
+  label: string
+  key: string
+}
+
+export interface LdapBrowserNode {
+  dn: string
+  name: string
+  rdn: string
+  /** Clase más específica del objeto. */
+  objectClass: string
+  allClasses: string[]
+  kind: NodeKind
+  description?: string
+  expandable: boolean
+}
+
+/* ---------------- Directivas de grupo ---------------- */
+
+export interface GpoInfo {
+  dn: string
+  guid: string
+  name: string
+  /** Ruta en SYSVOL donde viven los archivos de la directiva. */
+  path: string
+  computerVersion: number
+  userVersion: number
+  flags: number
+  statusLabel: string
+  userDisabled: boolean
+  computerDisabled: boolean
+  machineExtensions: number
+  userExtensions: number
+  wmiFilter?: string
+  created?: string
+  changed?: string
+  /** En cuántos sitios, dominios u OUs está vinculada. */
+  linkCount: number
+}
+
+export interface GpoLink {
+  gpoDN: string
+  gpoName: string
+  /** 1 = el de mayor precedencia. */
+  order: number
+  options: number
+  enabled: boolean
+  enforced: boolean
+}
+
+export interface GpoScope {
+  dn: string
+  name: string
+  type: 'domain' | 'ou' | 'site'
+  blockInheritance: boolean
+  links: GpoLink[]
+}
+
+export interface WmiFilter {
+  dn: string
+  id: string
+  name: string
+  description?: string
+  query: string
+  changed?: string
+}
+
+/* ---------------- Certificados ---------------- */
+
+export interface TemplateRisk {
+  id: string
+  severity: 'alta' | 'media' | 'baja'
+  label: string
+  detail: string
+}
+
+export interface CertificateTemplate {
+  dn: string
+  cn: string
+  name: string
+  schemaVersion: number
+  revision: number
+  nameFlags: number
+  enrollmentFlags: number
+  raSignatures: number
+  minimalKeySize: number
+  ekus: string[]
+  ekuNames: string[]
+  /** El solicitante elige el sujeto del certificado. */
+  suppliesSubject: boolean
+  requiresApproval: boolean
+  autoEnroll: boolean
+  publishToDs: boolean
+  noSecurityExtension: boolean
+  publishedBy: string[]
+  validity: string
+  risks: TemplateRisk[]
+}
+
+export interface CertificateAuthority {
+  dn: string
+  name: string
+  host: string
+  templates: string[]
+  subject: string
+  flags: number
 }

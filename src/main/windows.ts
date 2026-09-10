@@ -7,7 +7,7 @@ import { app, BrowserWindow, nativeImage, nativeTheme, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
-export type ConsoleId = 'aduc' | 'sites' | 'trusts' | 'dfs' | 'dns' | 'dhcp'
+export type ConsoleId = 'aduc' | 'sites' | 'trusts' | 'dfs' | 'dns' | 'dhcp' | 'ldap' | 'gpo' | 'adcs'
 
 export interface ConsoleDef {
   id: ConsoleId
@@ -60,6 +60,27 @@ export const CONSOLES: Record<ConsoleId, ConsoleDef> = {
     page: 'dhcp.html',
     width: 1240,
     height: 800
+  },
+  ldap: {
+    id: 'ldap',
+    title: 'ADeep — Editor LDAP',
+    page: 'ldap.html',
+    width: 1400,
+    height: 880
+  },
+  gpo: {
+    id: 'gpo',
+    title: 'ADeep — Directivas de grupo',
+    page: 'gpo.html',
+    width: 1380,
+    height: 860
+  },
+  adcs: {
+    id: 'adcs',
+    title: 'ADeep — Certificados',
+    page: 'adcs.html',
+    width: 1400,
+    height: 860
   }
 }
 

@@ -47,7 +47,10 @@ export default defineConfig({
           trusts: resolve(__dirname, 'src/renderer/trusts.html'),
           dfs: resolve(__dirname, 'src/renderer/dfs.html'),
           dns: resolve(__dirname, 'src/renderer/dns.html'),
-          dhcp: resolve(__dirname, 'src/renderer/dhcp.html')
+          dhcp: resolve(__dirname, 'src/renderer/dhcp.html'),
+          ldap: resolve(__dirname, 'src/renderer/ldap.html'),
+          gpo: resolve(__dirname, 'src/renderer/gpo.html'),
+          adcs: resolve(__dirname, 'src/renderer/adcs.html')
         }
       }
     },

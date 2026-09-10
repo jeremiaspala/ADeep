@@ -448,6 +448,68 @@ async function main(): Promise<void> {
   await check('dhcp.state', () => dhcpOps.getState(conn),
     (d) => `${d.servers.length} servidor(es) autorizado(s)${d.servers.length ? ': ' + d.servers.map((s) => `${s.name ?? ''} ${s.address}`).join(', ') : ''}; ${d.candidates.length} equipo(s) con SPN de DHCP`)
 
+  /* ---------------- Navegador LDAP ---------------- */
+
+  const browserOps = await import('./ldapbrowser/operations')
+  await check('ldapb.contexts', async () => browserOps.listContexts(conn),
+    (l) => l.map((c) => c.label).join(', '))
+  await check('ldapb.children (raíz del dominio)', () => browserOps.listChildren(conn, conn.baseDN),
+    (l) => `${l.length} hijos: ${l.slice(0, 6).map((x) => x.name).join(', ')}`)
+  await check('ldapb.children (Configuration)', () => browserOps.listChildren(conn, conn.configDN),
+    (l) => `${l.length} hijos: ${l.slice(0, 5).map((x) => x.name).join(', ')}`)
+
+  /* ---------------- Directivas de grupo ---------------- */
+
+  const gpoOps = await import('./gpo/operations')
+  const gpos = await check('gpo.list', () => gpoOps.listGpos(conn),
+    (l) => `${l.length} GPOs, ${l.filter((g) => g.linkCount === 0).length} sin vincular, ${l.filter((g) => g.flags !== 0).length} con configuración deshabilitada`)
+  const scopes = await check('gpo.scopes', () => gpoOps.listScopes(conn),
+    (l) => `${l.length} ámbitos, ${l.filter((s) => s.links.length).length} con vínculos, ${l.filter((s) => s.blockInheritance).length} bloquean herencia`)
+  await check('gpo.wmiFilters', () => gpoOps.listWmiFilters(conn), (l) => `${l.length} filtro(s)`)
+  await check('gpo: gPLink ida y vuelta', async () => {
+    const conVinculos = (scopes ?? []).filter((s) => s.links.length)
+    let iguales = 0
+    for (const s of conVinculos) {
+      const entry = await conn.searchOne(s.dn, ['gPLink'])
+      const original = entry ? (entry.attrs.gPLink?.[0] ?? '').toString() : ''
+      const links = gpoOps.parseGpLink(original)
+      if (gpoOps.buildGpLink(links) === original) iguales++
+    }
+    return { total: conVinculos.length, iguales }
+  }, (r) => r.total === r.iguales
+    ? `${r.total} atributos gPLink reconstruidos idénticos`
+    : `${r.iguales}/${r.total} idénticos — REVISAR`)
+
+  if (scopes?.length) {
+    console.log()
+    for (const s of scopes.filter((x) => x.links.length).slice(0, 5)) {
+      console.log(`   ${s.type.padEnd(7)} ${s.name}${s.blockInheritance ? ' [bloquea herencia]' : ''}`)
+      for (const l of s.links) {
+        console.log(`      ${l.order}. ${l.gpoName}${l.enforced ? ' [exigido]' : ''}${l.enabled ? '' : ' [deshabilitado]'}`)
+      }
+    }
+    console.log()
+  }
+
+  /* ---------------- Certificados ---------------- */
+
+  const adcsOps = await import('./adcs/operations')
+  await check('adcs.authorities', () => adcsOps.listAuthorities(conn),
+    (l) => l.length ? l.map((c) => `${c.name} en ${c.host} (${c.templates.length} plantillas)`).join(', ') : 'ninguna')
+  const plantillas = await check('adcs.templates', () => adcsOps.listTemplates(conn),
+    (l) => `${l.length} plantillas, ${l.filter((t) => t.publishedBy.length).length} publicadas por alguna CA, ${l.filter((t) => t.risks.some((r) => r.severity === 'alta')).length} con observaciones graves`)
+  await check('adcs.stores', () => adcsOps.listTrustStores(conn),
+    (l) => l.map((s) => `${s.store}: ${s.certificates}`).join(', '))
+
+  if (plantillas?.some((t) => t.risks.length)) {
+    console.log()
+    for (const t of plantillas.filter((x) => x.risks.length)) {
+      console.log(`   ${t.name}${t.publishedBy.length ? ` — publicada por ${t.publishedBy.join(', ')}` : ' — sin publicar'}`)
+      for (const r of t.risks) console.log(`      [${r.id}] (${r.severity}) ${r.label}`)
+    }
+    console.log()
+  }
+
   await conn.disconnect()
 
   /* ---------------- Reporte ---------------- */

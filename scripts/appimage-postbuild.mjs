@@ -64,7 +64,10 @@ const CONSOLES = [
   { id: 'trusts', name: 'ADeep — Dominios y confianzas', generic: 'Dominios y confianzas de Active Directory', comment: 'Dominios del bosque, confianzas y sufijos UPN' },
   { id: 'dfs', name: 'ADeep — Administración de DFS', generic: 'Administración de DFS', comment: 'Espacios de nombres DFS y replicación DFS-R' },
   { id: 'dns', name: 'ADeep — DNS', generic: 'DNS integrado en Active Directory', comment: 'Zonas y registros DNS del directorio' },
-  { id: 'dhcp', name: 'ADeep — DHCP', generic: 'DHCP', comment: 'Servidores DHCP autorizados en el dominio' }
+  { id: 'dhcp', name: 'ADeep — DHCP', generic: 'DHCP', comment: 'Servidores DHCP autorizados en el dominio' },
+  { id: 'ldap', name: 'ADeep — Editor LDAP', generic: 'Editor de directorio', comment: 'Acceso crudo a cualquier contexto de nombres' },
+  { id: 'gpo', name: 'ADeep — Directivas de grupo', generic: 'Directivas de grupo', comment: 'Directivas, vínculos, herencia y precedencia' },
+  { id: 'adcs', name: 'ADeep — Certificados', generic: 'Servicios de certificados', comment: 'Entidades emisoras, plantillas y revisión de seguridad' }
 ]
 
 /** Un lanzador por consola, todos apuntando al mismo AppImage. */

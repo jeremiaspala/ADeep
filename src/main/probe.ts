@@ -12,14 +12,37 @@ async function main(): Promise<void> {
   const conn = await AdConnection.connect(p, (await store.getSecret(p.id))!)
   const base = conn.baseDN, cfg = conn.configDN
 
-  const zoneDN = `DC=ejemplo.local,CN=MicrosoftDNS,DC=DomainDnsZones,${base}`
-  const z = await conn.searchOne(zoneDN, ['dNSProperty'])
-  console.log('### dNSProperty de la zona principal')
-  for (const v of z?.attrs.dNSProperty ?? []) {
-    if (!Buffer.isBuffer(v)) { console.log('   (no es buffer)'); continue }
-    console.log(`   len=${v.length} dataLength=${v.readUInt32LE(0)} id=0x${v.readUInt32LE(16).toString(16)} valor=${v.length >= 24 ? v.readUInt32LE(20) : '-'} hex=${v.toString('hex')}`)
+  const show = async (label: string, dn: string, filter: string, attrs: string[], limit = 6): Promise<void> => {
+    try {
+      const r = await conn.searchRaw(dn, { scope: 'sub', filter, attributes: attrs, sizeLimit: 300 })
+      console.log(`\n### ${label}: ${r.length}`)
+      for (const e of r.slice(0, limit)) {
+        console.log('  •', e.dn.split(',').slice(0, 2).join(','))
+        for (const a of attrs) {
+          const key = Object.keys(e.attrs).find(k => k.toLowerCase() === a.toLowerCase())
+          if (!key) continue
+          const v = e.attrs[key].map(x => Buffer.isBuffer(x) ? `<${x.length}B ${x.subarray(0,12).toString('hex')}>` : String(x)).join(' | ')
+          if (v) console.log(`      ${a} = ${v.slice(0, 150)}`)
+        }
+      }
+    } catch (e) { console.log(`\n### ${label}: ERROR ${(e as Error).message}`) }
   }
-  void cfg
+
+  console.log('### namingContexts'); for (const nc of conn.rootDSE.namingContexts) console.log('   ', nc)
+
+  await show('GPOs', `CN=Policies,CN=System,${base}`, '(objectClass=groupPolicyContainer)',
+    ['displayName', 'gPCFileSysPath', 'versionNumber', 'flags', 'gPCMachineExtensionNames', 'whenChanged'], 8)
+  await show('Vínculos gPLink', base, '(gPLink=*)', ['name', 'gPLink', 'gPOptions'], 10)
+  await show('Filtros WMI', `CN=SOM,CN=WMIPolicy,CN=System,${base}`, '(objectClass=msWMI-Som)', ['msWMI-Name', 'msWMI-Parm2'], 4)
+  await show('Plantillas de certificado', `CN=Certificate Templates,CN=Public Key Services,CN=Services,${cfg}`,
+    '(objectClass=pKICertificateTemplate)',
+    ['displayName', 'msPKI-Certificate-Name-Flag', 'msPKI-Enrollment-Flag', 'pKIExtendedKeyUsage', 'msPKI-RA-Signature', 'msPKI-Template-Schema-Version', 'revision'], 6)
+  await show('Entidades emisoras', `CN=Enrollment Services,CN=Public Key Services,CN=Services,${cfg}`,
+    '(objectClass=pKIEnrollmentService)', ['displayName', 'dNSHostName', 'certificateTemplates', 'cACertificateDN'], 4)
+  await show('CAs raíz', `CN=Certification Authorities,CN=Public Key Services,CN=Services,${cfg}`,
+    '(objectClass=certificationAuthority)', ['cn', 'cACertificate'], 4)
+  await show('NTAuth', `CN=Public Key Services,CN=Services,${cfg}`, '(cn=NTAuthCertificates)', ['cn', 'cACertificate'], 2)
+
   await conn.disconnect()
   app.exit(0)
 }
