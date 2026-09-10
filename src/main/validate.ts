@@ -324,6 +324,70 @@ async function main(): Promise<void> {
     return { classes: classes.length, rights: rights.length }
   }, (r) => `${r.classes} clases del esquema, ${r.rights} derechos extendidos`)
 
+  /* ---------------- Sitios y servicios ---------------- */
+
+  const sitesOps = await import('./sites/operations')
+  await check('sites.list', () => sitesOps.listSites(conn),
+    (l) => `${l.length} sitio(s): ${l.map((s) => `${s.name} (${s.servers} DC, ${s.subnets.length} subredes)`).join(', ')}`)
+  await check('sites.subnets', () => sitesOps.listSubnets(conn),
+    (l) => `${l.length} subred(es)${l.length ? ': ' + l.slice(0, 5).map((s) => `${s.name}→${s.siteName ?? 'sin sitio'}`).join(', ') : ''}`)
+  await check('sites.links', () => sitesOps.listSiteLinks(conn),
+    (l) => l.map((x) => `${x.name} [${x.transport}] coste ${x.cost}, cada ${x.replInterval}min, ${x.siteNames.length} sitios${x.schedule ? ', con programación' : ''}`).join(' | ') || 'ninguno')
+  await check('sites.servers', () => sitesOps.listServers(conn),
+    (l) => l.map((s) => `${s.name}${s.isGC ? '(GC)' : ''}${s.isISTG ? '(ISTG)' : ''} ${s.connections.length}conn`).join(', '))
+  await check('sites.validateSubnet', async () => ({
+    ok: sitesOps.validateSubnet('10.20.0.0/16'),
+    malaRed: sitesOps.validateSubnet('10.20.1.5/16'),
+    basura: sitesOps.validateSubnet('no-es-una-red'),
+    v6: sitesOps.validateSubnet('2001:db8::/64')
+  }), (r) => `válida:${r.ok === undefined} detecta-no-red:${!!r.malaRed} detecta-basura:${!!r.basura} ipv6:${r.v6 === undefined}`)
+  await check('sites.schedule round-trip', async () => {
+    const hours = Array.from({ length: 168 }, (_, i) => i % 3 === 0)
+    const buf = sitesOps.buildSchedule(hours)
+    const back = sitesOps.parseSchedule(buf)
+    return { size: buf.length, equal: !!back && back.every((v, i) => v === hours[i]) }
+  }, (r) => `${r.size} bytes, ida y vuelta correcta: ${r.equal}`)
+
+  /* ---------------- Dominios y confianzas ---------------- */
+
+  const trustOps = await import('./trusts/operations')
+  await check('trusts.forest', () => trustOps.getForestInfo(conn),
+    (f) => `${f.partitions.length} particiones, ${f.trusts.length} confianzas, ${f.upnSuffixes.length} sufijos UPN, bosque nivel ${f.forestFunctionality}`)
+  await check('trusts.partitions', () => trustOps.listPartitions(conn),
+    (l) => l.map((p) => `${p.name}${p.isDomain ? ' [dominio]' : p.isApplicationPartition ? ' [app]' : ' [config]'}`).join(', '))
+  await check('trusts.list', () => trustOps.listTrusts(conn),
+    (l) => l.length ? l.map((t) => `${t.partner} ${t.directionLabel}/${t.typeLabel}`).join(', ') : 'ninguna (dominio único)')
+  await check('trusts.maxSupportedLevel', () => trustOps.maxSupportedLevel(conn), (n) => `nivel ${n}`)
+
+  /* ---------------- DFS ---------------- */
+
+  const dfsOps = await import('./dfs/operations')
+  const namespaces = await check('dfs.namespaces', () => dfsOps.listNamespaces(conn),
+    (l) => l.map((n) => `${n.name} v${n.version} (${n.rootTargets.length} raíces, ${n.folders.length} carpetas${n.partial ? ', PARCIAL' : ''})`).join(' | '))
+  if (namespaces?.length) {
+    console.log()
+    for (const ns of namespaces) {
+      console.log(`   ${ns.path}  (v${ns.version})`)
+      for (const t of ns.rootTargets) console.log(`      raíz → ${t.path}${t.enabled ? '' : ' [deshabilitado]'}`)
+      for (const f of ns.folders) {
+        console.log(`      ${f.path}${f.comment ? `  — ${f.comment}` : ''}`)
+        for (const t of f.targets) console.log(`         → ${t.path}${t.enabled ? '' : ' [deshabilitado]'}`)
+      }
+    }
+    console.log()
+  }
+  await check('dfs.replicationGroups', () => dfsOps.listReplicationGroups(conn),
+    (l) => l.map((g) => `${g.name}${g.isSysvol ? '(SYSVOL)' : ''}: ${g.members.length} miembros, ${g.connections.length} conexiones, ${g.contentSets.length} contenidos`).join(' | '))
+  await check('dfs.targetList v2 round-trip', async () => {
+    const targets = [
+      { path: '\\\\srv1\\datos', server: 'srv1', share: 'datos', enabled: true },
+      { path: '\\\\srv2\\datos', server: 'srv2', share: 'datos', enabled: false }
+    ]
+    const xml = dfsOps.buildTargetListV2(targets)
+    const back = dfsOps.parseTargetListV2(xml)
+    return back.length === 2 && back[0].enabled && !back[1].enabled && back[1].server === 'srv2'
+  }, (ok) => ok ? 'correcto' : 'FALLA')
+
   await conn.disconnect()
 
   /* ---------------- Reporte ---------------- */

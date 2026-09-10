@@ -2,7 +2,8 @@ import type { JSX } from 'react'
 import {
   Building2, Boxes, FolderTree, Folder, FolderCog, User, UserRound, Users,
   Monitor, Contact, Printer, HardDrive, Bot, ShieldQuestion, Trash2, FileQuestion,
-  Network
+  Network, Globe, Link2, Server, Cpu, Cable, Handshake, TreePine, Share2,
+  FolderSymlink, HardDriveDownload, RefreshCcw, GitBranch, Waypoints
 } from 'lucide-react'
 import type { NodeKind } from '@shared/types'
 
@@ -22,6 +23,30 @@ export const KIND_LABEL: Record<NodeKind, string> = {
   inetOrgPerson: 'InetOrgPerson',
   foreignSecurityPrincipal: 'Entidad de seguridad externa',
   lostAndFound: 'lostAndFound',
+  sitesRoot: 'Sitios',
+  site: 'Sitio',
+  subnetsRoot: 'Subredes',
+  subnet: 'Subred',
+  transportsRoot: 'Transportes entre sitios',
+  transport: 'Transporte',
+  siteLink: 'Vínculo de sitios',
+  siteLinkBridge: 'Puente de vínculos',
+  serversRoot: 'Servidores',
+  server: 'Servidor',
+  ntdsSettings: 'NTDS Settings',
+  connection: 'Conexión',
+  forest: 'Bosque',
+  partition: 'Partición',
+  trust: 'Relación de confianza',
+  dfsRoot: 'Espacios de nombres',
+  dfsNamespace: 'Espacio de nombres',
+  dfsFolder: 'Carpeta DFS',
+  dfsTarget: 'Destino',
+  dfsrRoot: 'Replicación DFS',
+  dfsrGroup: 'Grupo de replicación',
+  dfsrContent: 'Contenido replicado',
+  dfsrMember: 'Miembro',
+  dfsrConnection: 'Conexión de replicación',
   unknown: 'Objeto'
 }
 
@@ -41,6 +66,30 @@ const COLORS: Record<NodeKind, string> = {
   inetOrgPerson: '#4f8cff',
   foreignSecurityPrincipal: '#8b95a3',
   lostAndFound: '#8b95a3',
+  sitesRoot: 'var(--accent)',
+  site: '#5cc2a0',
+  subnetsRoot: '#e0a53f',
+  subnet: '#e0a53f',
+  transportsRoot: '#b57ce0',
+  transport: '#b57ce0',
+  siteLink: '#b57ce0',
+  siteLinkBridge: '#b57ce0',
+  serversRoot: '#c8a24a',
+  server: '#4f8cff',
+  ntdsSettings: '#8b95a3',
+  connection: '#7cc0e0',
+  forest: '#5cc2a0',
+  partition: '#c8a24a',
+  trust: '#e0a53f',
+  dfsRoot: 'var(--accent)',
+  dfsNamespace: '#5cc2a0',
+  dfsFolder: '#e0a53f',
+  dfsTarget: '#7cc0e0',
+  dfsrRoot: '#b57ce0',
+  dfsrGroup: '#b57ce0',
+  dfsrContent: '#c8a24a',
+  dfsrMember: '#4f8cff',
+  dfsrConnection: '#7cc0e0',
   unknown: '#8b95a3'
 }
 
@@ -70,6 +119,30 @@ export function KindIcon({
     case 'gmsa':
     case 'msa': return <Bot {...props} />
     case 'foreignSecurityPrincipal': return <ShieldQuestion {...props} />
+    case 'sitesRoot': return <Network {...props} />
+    case 'site': return <Building2 {...props} />
+    case 'subnetsRoot':
+    case 'subnet': return <Globe {...props} />
+    case 'transportsRoot':
+    case 'transport': return <Waypoints {...props} />
+    case 'siteLink':
+    case 'siteLinkBridge': return <Link2 {...props} />
+    case 'serversRoot': return <Folder {...props} />
+    case 'server': return <Server {...props} />
+    case 'ntdsSettings': return <Cpu {...props} />
+    case 'connection': return <Cable {...props} />
+    case 'forest': return <TreePine {...props} />
+    case 'partition': return <GitBranch {...props} />
+    case 'trust': return <Handshake {...props} />
+    case 'dfsRoot': return <Share2 {...props} />
+    case 'dfsNamespace': return <Share2 {...props} />
+    case 'dfsFolder': return <FolderSymlink {...props} />
+    case 'dfsTarget': return <HardDriveDownload {...props} />
+    case 'dfsrRoot':
+    case 'dfsrGroup': return <RefreshCcw {...props} />
+    case 'dfsrContent': return <Folder {...props} />
+    case 'dfsrMember': return <Server {...props} />
+    case 'dfsrConnection': return <Cable {...props} />
     default: return <FileQuestion {...props} />
   }
 }

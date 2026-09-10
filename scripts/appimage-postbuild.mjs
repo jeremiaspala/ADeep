@@ -56,6 +56,56 @@ async function patchAppRun(appDir) {
   await writeFile(path, patched, { mode: 0o755 })
 }
 
+const CONSOLES = [
+  { id: 'aduc', name: 'ADeep — Usuarios y equipos', comment: 'Usuarios, grupos, equipos y OUs de Active Directory' },
+  { id: 'sites', name: 'ADeep — Sitios y servicios', comment: 'Sitios, subredes, vínculos y replicación de AD' },
+  { id: 'trusts', name: 'ADeep — Dominios y confianzas', comment: 'Dominios del bosque, confianzas y sufijos UPN' },
+  { id: 'dfs', name: 'ADeep — Administración de DFS', comment: 'Espacios de nombres DFS y replicación DFS-R' }
+]
+
+/**
+ * Cada consola es una ventana propia, pero comparten binario y sesión: un solo
+ * AppImage con un lanzador .desktop por consola en vez de cuatro copias de 94 MB.
+ */
+async function writeLaunchers(appImage) {
+  const dir = join(root, 'release', 'launchers')
+  await mkdir(dir, { recursive: true })
+
+  for (const c of CONSOLES) {
+    const desktop = [
+      '[Desktop Entry]',
+      'Type=Application',
+      `Name=${c.name}`,
+      `Comment=${c.comment}`,
+      `Exec=${appImage} --no-sandbox --console=${c.id} %U`,
+      'Icon=adeep',
+      'Terminal=false',
+      'Categories=System;',
+      'StartupWMClass=ADeep',
+      ''
+    ].join('\n')
+    await writeFile(join(dir, `adeep-${c.id}.desktop`), desktop, { mode: 0o755 })
+  }
+
+  const install = [
+    '#!/bin/sh',
+    '# Instala un lanzador por consola en el menú del escritorio.',
+    'set -e',
+    'DEST="$HOME/.local/share/applications"',
+    'ICONS="$HOME/.local/share/icons/hicolor/512x512/apps"',
+    'mkdir -p "$DEST" "$ICONS"',
+    'DIR="$(cd "$(dirname "$0")" && pwd)"',
+    'cp "$DIR"/adeep-*.desktop "$DEST"/',
+    '[ -f "$DIR/../../build/icon.png" ] && cp "$DIR/../../build/icon.png" "$ICONS/adeep.png" || true',
+    'update-desktop-database "$DEST" 2>/dev/null || true',
+    'echo "Lanzadores instalados en $DEST"',
+    ''
+  ].join('\n')
+  await writeFile(join(dir, 'instalar-lanzadores.sh'), install, { mode: 0o755 })
+
+  console.log(`✓ ${dir}: ${CONSOLES.length} lanzadores + instalar-lanzadores.sh`)
+}
+
 async function main() {
   await ensureRuntime()
   const appImage = await findAppImage()
@@ -87,6 +137,8 @@ async function main() {
     await rename(out, appImage)
     const { size } = await stat(appImage)
     console.log(`✓ ${appImage} (${(size / 1024 / 1024).toFixed(0)} MB)`)
+
+    await writeLaunchers(appImage)
   } finally {
     await rm(work, { recursive: true, force: true })
   }

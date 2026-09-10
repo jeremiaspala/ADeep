@@ -66,6 +66,14 @@ export type NodeKind =
   | 'inetOrgPerson'
   | 'foreignSecurityPrincipal'
   | 'lostAndFound'
+  // Sitios y servicios
+  | 'sitesRoot' | 'site' | 'subnetsRoot' | 'subnet' | 'transportsRoot' | 'transport'
+  | 'siteLink' | 'siteLinkBridge' | 'serversRoot' | 'server' | 'ntdsSettings' | 'connection'
+  // Dominios y confianzas
+  | 'forest' | 'partition' | 'trust'
+  // DFS
+  | 'dfsRoot' | 'dfsNamespace' | 'dfsFolder' | 'dfsTarget'
+  | 'dfsrRoot' | 'dfsrGroup' | 'dfsrContent' | 'dfsrMember' | 'dfsrConnection'
   | 'unknown'
 
 export interface DirEntry {
@@ -298,4 +306,205 @@ export interface AppResult<T> {
   error?: string
   /** Código LDAP cuando aplica. */
   code?: number
+}
+
+/* ---------------- Sitios y servicios ---------------- */
+
+export interface SiteInfo {
+  dn: string
+  name: string
+  description?: string
+  location?: string
+  servers: number
+  subnets: string[]
+  /** DN del NTDS Settings que actúa de ISTG. */
+  istg?: string
+  /** options de nTDSSiteSettings. */
+  settingsOptions: number
+}
+
+export interface SubnetInfo {
+  dn: string
+  /** RDN, en formato CIDR: 10.0.0.0/24 */
+  name: string
+  siteDN?: string
+  siteName?: string
+  location?: string
+  description?: string
+}
+
+export interface SiteLinkInfo {
+  dn: string
+  name: string
+  transport: 'IP' | 'SMTP'
+  cost: number
+  /** Minutos entre replicaciones. */
+  replInterval: number
+  sites: string[]
+  siteNames: string[]
+  /** Bit 1 de options: replicación con notificación. */
+  notify: boolean
+  /** Bit 2: compresión deshabilitada. */
+  noCompression: boolean
+  description?: string
+  /** Bitmap de 7x24 (168 posiciones); vacío = siempre disponible. */
+  schedule?: boolean[]
+}
+
+export interface DsaServerInfo {
+  dn: string
+  name: string
+  siteDN: string
+  siteName: string
+  dnsHostName?: string
+  /** DN del objeto computer en el dominio. */
+  serverReference?: string
+  ntdsDN?: string
+  /** options de nTDSDSA: bit 1 = catálogo global. */
+  ntdsOptions: number
+  isGC: boolean
+  isISTG: boolean
+  connections: ConnectionInfo[]
+}
+
+export interface ConnectionInfo {
+  dn: string
+  name: string
+  /** DN del NTDS Settings origen. */
+  fromServer: string
+  fromServerName: string
+  enabled: boolean
+  /** Bit 1 de options: la generó el KCC. */
+  generatedByKcc: boolean
+  /** Bit 8: sin compresión entre sitios. */
+  noCompression: boolean
+  schedule?: boolean[]
+}
+
+/* ---------------- Dominios y confianzas ---------------- */
+
+export interface TrustInfo {
+  dn: string
+  name: string
+  partner: string
+  flatName?: string
+  /** 1 entrante, 2 saliente, 3 bidireccional. */
+  direction: number
+  directionLabel: string
+  /** 1 downlevel, 2 uplevel, 3 MIT Kerberos, 4 DCE. */
+  type: number
+  typeLabel: string
+  attributes: number
+  attributeLabels: string[]
+  transitive: boolean
+  forestTransitive: boolean
+  sidFiltering: boolean
+  selectiveAuth: boolean
+  sid?: string
+  encryptionTypes?: number
+  whenCreated?: string
+  whenChanged?: string
+  /** Espacios de nombres de una confianza de bosque. */
+  forestNamespaces?: string[]
+}
+
+export interface PartitionInfo {
+  dn: string
+  name: string
+  ncName: string
+  dnsRoot: string
+  netbiosName?: string
+  /** msDS-Behavior-Version del dominio. */
+  behaviorVersion?: number
+  systemFlags: number
+  isDomain: boolean
+  isApplicationPartition: boolean
+}
+
+export interface ForestInfo {
+  rootDomain: string
+  forestFunctionality: number
+  domainFunctionality: number
+  partitionsDN: string
+  upnSuffixes: string[]
+  spnSuffixes: string[]
+  partitions: PartitionInfo[]
+  trusts: TrustInfo[]
+}
+
+/* ---------------- DFS ---------------- */
+
+export interface DfsTarget {
+  /** \\servidor\recurso */
+  path: string
+  server: string
+  share: string
+  /** El destino está habilitado (state 2 = online en v1). */
+  enabled: boolean
+  /** Sólo v2. */
+  priorityClass?: number
+  priorityRank?: number
+}
+
+export interface DfsFolder {
+  /** Ruta relativa dentro del espacio de nombres. */
+  path: string
+  comment?: string
+  /** Segundos de TTL del referral. */
+  ttl?: number
+  targets: DfsTarget[]
+  /** DN del objeto msDFS-Linkv2 (sólo en namespaces v2). */
+  dn?: string
+}
+
+export interface DfsNamespace {
+  dn: string
+  name: string
+  /** 1 = standalone/dominio modo 2000 (fTDfs + pKT); 2 = modo Windows 2008 (msDFS-*v2). */
+  version: 1 | 2
+  /** \\dominio\nombre */
+  path: string
+  comment?: string
+  ttl?: number
+  rootTargets: DfsTarget[]
+  folders: DfsFolder[]
+  /** El blob pKT no se pudo interpretar; sólo hay destinos de raíz. */
+  partial?: boolean
+}
+
+export interface DfsrMember {
+  dn: string
+  name: string
+  computerDN?: string
+  computerName?: string
+  /** Ruta local replicada. */
+  contentPath?: string
+  stagingPath?: string
+  enabled: boolean
+  readOnly: boolean
+  contentSetName?: string
+}
+
+export interface DfsrConnectionInfo {
+  dn: string
+  name: string
+  fromMember: string
+  fromMemberName: string
+  toMemberName: string
+  enabled: boolean
+  rdc: boolean
+  schedule?: boolean[]
+}
+
+export interface DfsrGroup {
+  dn: string
+  name: string
+  description?: string
+  /** 0 = grupo común, 1 = SYSVOL. */
+  groupType: number
+  isSysvol: boolean
+  contentSets: { dn: string; name: string; description?: string }[]
+  members: DfsrMember[]
+  connections: DfsrConnectionInfo[]
+  schedule?: boolean[]
 }

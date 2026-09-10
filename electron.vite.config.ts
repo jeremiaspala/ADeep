@@ -10,7 +10,8 @@ export default defineConfig({
         input: {
           index: resolve(__dirname, 'src/main/index.ts'),
           // Arnés de validación de sólo lectura: `npm run validate`.
-          validate: resolve(__dirname, 'src/main/validate.ts')
+          validate: resolve(__dirname, 'src/main/validate.ts'),
+          uitest: resolve(__dirname, 'src/main/uitest.ts')
         }
       }
     }
@@ -33,7 +34,12 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/renderer/index.html') }
+        input: {
+          index: resolve(__dirname, 'src/renderer/index.html'),
+          sites: resolve(__dirname, 'src/renderer/sites.html'),
+          trusts: resolve(__dirname, 'src/renderer/trusts.html'),
+          dfs: resolve(__dirname, 'src/renderer/dfs.html')
+        }
       }
     },
     plugins: [react()]

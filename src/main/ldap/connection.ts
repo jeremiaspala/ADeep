@@ -26,7 +26,11 @@ const BINARY_ATTRS = [
   'networkAddress', 'oMObjectClass', 'msDS-Site-Affinity', 'partialAttributeSet',
   'msPKI-Enrollment-Flag', 'pKIExpirationPeriod', 'pKIOverlapPeriod', 'pKIKeyUsage',
   'pKICriticalExtensions', 'pKIExtendedKeyUsage', 'pKIDefaultKeySpec', 'pKIEnrollmentAccess',
-  'terminalServer', 'msRADIUSFramedIPAddress', 'msRTCSIP-UserRoutingGroupId'
+  'terminalServer', 'msRADIUSFramedIPAddress', 'msRTCSIP-UserRoutingGroupId',
+  // Sitios, confianzas y DFS.
+  'invocationId', 'pKT', 'pKTGuid', 'msDS-TrustForestTrustInfo',
+  'msDFS-TargetListv2', 'msDFS-GenerationGUIDv2', 'msDFS-NamespaceIdentityGUIDv2',
+  'msDFS-LinkIdentityGUIDv2', 'msDFSR-ExtensionsGuid', 'msDFSR-MemberReferenceBL'
 ]
 
 /** Nombre normalizado (minúsculas) de todos los atributos binarios. */

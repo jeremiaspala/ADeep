@@ -2,7 +2,7 @@
 
 > Documento de continuidad. Si retomás la sesión sin contexto previo, **leé esto primero**
 > y seguí por la fase que esté marcada como en curso.
-> Última actualización: 2026-09-10.
+> Última actualización: 2026-09-10 (fases 0 a 3 terminadas).
 
 ---
 
@@ -27,9 +27,22 @@ preferencias, columnas, info del dominio.
 **Empaquetado.** `electron-builder.yml` + `scripts/appimage-postbuild.mjs` →
 `release/ADeep-0.1.0-x86_64.AppImage` que arranca en distros con sólo FUSE 3.
 
-### Qué NO está probado — leer con atención
+### Estado de la validación
 
-**Ninguna operación LDAP se ejecutó nunca contra un DC real.** Lo verificado es:
+`npm run validate` corre 40 verificaciones **de sólo lectura** contra el DC del perfil
+guardado — se puede ejecutar sin riesgo en producción. Al 2026-09-10, 40/40 en verde contra
+`dc01.ejemplo.local` (dominio real, 634 usuarios, 378 equipos, 4 DC).
+
+`npm run uitest` abre las cuatro consolas, se conecta con el perfil guardado y captura la
+pantalla de cada una. También sólo lectura.
+
+Lo que la validación **no** cubre: ninguna operación de escritura se ejecutó nunca contra un
+dominio real (crear, borrar, mover, cambiar contraseñas, escribir ACLs). Antes de usar esas
+funciones en producción hay que probarlas en un lab.
+
+### Qué NO estaba probado — histórico
+
+**Ninguna operación LDAP se había ejecutado contra un DC real hasta la Fase 0.** Lo verificado es:
 `npm run typecheck` limpio, `npm run build` limpio, el AppImage levanta y renderiza el diálogo
 de conexión. Todo lo que pasa después del bind es **código sin ejercitar**. Los puntos con más
 probabilidad de fallar en el primer contacto con un dominio real:
@@ -45,8 +58,8 @@ probabilidad de fallar en el primer contacto con un dominio real:
 7. Escrituras de contraseña: exigen canal cifrado; el código lo valida pero nunca se probó el
    `unicodePwd` real.
 
-**Tarea 0 de cualquier retomada: montar un lab (Samba AD DC alcanza) y hacer una pasada
-funcional completa antes de agregar consolas nuevas.**
+La Fase 0 encontró y corrigió cuatro bugs reales con esa pasada (ver el historial de git).
+**Sigue pendiente probar las escrituras en un lab.**
 
 ### Deuda pendiente de la consola ADUC
 
@@ -73,69 +86,58 @@ publicadas, Papelera de AD (restaurar objetos borrados), mover con arrastrar y s
 
 ---
 
-## 2. Arquitectura objetivo: ADeep como suite de consolas
+## 2. Arquitectura: consolas separadas
 
-El pedido es replicar más snap-ins de MMC. Antes de sumar la primera consola nueva hay que
-sacar la de ADUC de su lugar privilegiado, si no cada consola nueva duplica el shell.
+Decisión de Jeremías (2026-09-10): **consolas separadas, no un selector dentro de una ventana**,
+con el mismo sistema de diseño. Se implementó como en MMC:
 
-```
-src/
-  main/
-    ldap/            # compartido: conexión, encoding, sddl, controls
-    aduc/            # operations.ts actual, movido
-    sites/           # nuevo
-    trusts/          # nuevo
-    dfs/             # nuevo
-    dhcp/            # nuevo
-    ipc.ts           # registra los módulos de cada consola
-  renderer/src/
-    shell/           # App, menubar, toolbar, splitter, statusbar, selector de consola
-    consoles/
-      aduc/          # lo que hoy vive en components/ + lib/
-      sites/
-      trusts/
-      dfs/
-      dhcp/
-    components/      # ui.tsx y todo lo genuinamente compartido
-  shared/
-```
+- Una ventana por consola, cada una con su propio documento HTML y su punto de entrada
+  (`src/renderer/{index,sites,trusts,dfs}.html` + `src/renderer/src/main-*.tsx`).
+- `src/main/windows.ts` abre y trae al frente cada ventana; `--console=<id>` en la línea de
+  comandos abre una consola concreta, y una segunda ejecución reusa la instancia que ya corre.
+- **Una sola sesión LDAP** para todas: la conexión vive en el proceso principal y los cambios
+  se difunden con `session.changed`, así que conectarse en una consola conecta a todas.
+- El aspecto común sale de `src/renderer/src/shell/`: `ConsoleShell` (menús, toolbar, árbol,
+  lista, barra de estado), `SimpleTree`, `DetailList` y `ScheduleEditor`, más el CSS compartido.
+- Empaquetado: **un** AppImage y un lanzador `.desktop` por consola
+  (`release/launchers/`, con `instalar-lanzadores.sh`). Cuatro AppImages de 94 MB casi idénticos
+  no aportan nada; si se quisieran, alcanza con repetir el empaquetado cambiando `productName`.
 
-**Contrato de una consola** (`src/renderer/src/consoles/<id>/index.tsx`):
+ADUC conserva su `App.tsx` histórico (árbol LDAP perezoso, paginación, menús propios) y todavía
+no usa `ConsoleShell`; comparte el CSS y los diálogos. Migrarlo es deuda técnica, no urgente.
 
-```ts
-export interface ConsoleDef {
-  id: string
-  title: string
-  icon: LucideIcon
-  /** ¿Está disponible con la sesión actual? (p. ej. DHCP requiere otro transporte) */
-  available: (session: SessionInfo) => boolean
-  loadRoots: () => Promise<TreeNode[]>
-  loadChildren: (dn: string) => Promise<TreeNode[]>
-  listItems: (node: TreeNode) => Promise<ListRow[]>
-  columns: ColumnDef[]
-  contextMenu: (rows: ListRow[], parent: TreeNode) => MenuItemDef[]
-  properties?: (row: ListRow) => ReactNode
-}
-```
+## 2 bis. Alternativa descartada
 
-El shell queda agnóstico: árbol, lista, columnas, menús y statusbar se alimentan del
-`ConsoleDef` activo. El estado por consola vive en su propio slice del store (hoy `useApp`
-mezcla sesión, árbol y lista de ADUC).
+Se evaluó una sola ventana con un selector de consola y un contrato `ConsoleDef` común
+(árbol, lista, columnas y menús servidos por la consola activa). Se descartó por pedido
+explícito: las consolas van separadas, como los complementos de MMC. La idea del contrato
+sobrevive en `shell/` pero como componentes que cada consola compone a mano, no como un
+registro central.
 
 ---
 
 ## 3. Fases
 
-### Fase 0 — Validación y refactor de shell  *(hacer antes que todo)*
+### Fase 0 — Validación  ✅ terminada
 
-- [ ] Lab con Samba AD DC o Windows Server de prueba; pasada funcional de ADUC (ver §1).
-- [ ] Corregir lo que rompa esa pasada.
-- [ ] Extraer `shell/` y `consoles/aduc/`; implementar `ConsoleDef` y el selector de consolas.
-- [ ] Mover `src/main/ldap/operations.ts` → `src/main/aduc/operations.ts`; `ipc.ts` pasa a
-      registrar por módulo (`registerAducIpc`, `registerSitesIpc`, …).
-- [ ] Criterio de terminado: ADUC funciona igual que hoy pero cargada como una consola más.
+- [x] Arnés `npm run validate`: 40 verificaciones de sólo lectura contra el dominio real.
+- [x] **Bug crítico corregido:** los filtros LDAP con valores binarios se armaban como texto
+      con escapes `\XX` y ldapts los serializa en UTF-8, así que todo byte ≥ 0x80 se rompía
+      (`0xd7` → `0xc3 0x97`). Fallaban en silencio `search.bySid`, `search.byGuid`, la
+      resolución de nombres del editor de ACLs y el grupo principal. Ahora se arman con
+      `EqualityFilter` + Buffer (`src/main/ldap/filters.ts`).
+- [x] `getWellKnownContainers` devolvía GUIDs en vez de nombres; tres GUID well-known estaban
+      mal o faltaban.
+- [x] Configuration y Schema se clasificaban como particiones de aplicación.
+- [x] `pKT`, `invocationId`, `msDS-TrustForestTrustInfo` y los `msDFS-*v2` no estaban en la
+      lista de atributos binarios: llegaban corrompidos.
+- [x] Round-trip del descriptor de seguridad verificado sobre los **14 848 objetos** del
+      dominio: sin pérdida semántica (la diferencia de bytes es relleno del DC).
+- [x] Shell compartido (`src/renderer/src/shell/`) y ventanas por consola.
+- [ ] Pendiente: probar las **escrituras** en un lab.
+- [ ] Pendiente: migrar ADUC a `ConsoleShell`.
 
-### Fase 1 — Sitios y servicios de Active Directory
+### Fase 1 — Sitios y servicios de Active Directory  ✅ terminada
 
 Todo vive bajo `CN=Sites,CN=Configuration,<rootDomainNamingContext>`. Es 100% LDAP: la fase
 más directa de las cuatro.
@@ -154,19 +156,18 @@ más directa de las cuatro.
 | Conexión | `nTDSConnection` | `fromServer`, `enabledConnection`, `options`, `schedule` |
 | Config. del sitio | `nTDSSiteSettings` | `options` (bit 1 = KCC intra-sitio off, bit 16 = inter-sitio off), `interSiteTopologyGenerator` |
 
-- [ ] Lectura del árbol completo + lista con columnas propias.
-- [ ] Alta/baja/edición de sitios, subredes (validar CIDR), vínculos (coste, intervalo) y puentes.
-- [ ] Mover servidor entre sitios (`modifyDN` a `CN=Servers,CN=<sitio>,…`).
-- [ ] Marcar/desmarcar catálogo global (bit 1 de `nTDSDSA.options`).
-- [ ] Crear conexiones manuales; mostrar las automáticas del KCC como sólo lectura.
-- [ ] Editor de `schedule` (blob de 188 bytes: encabezado + 7×24 bytes de bitmap horario) —
-      reutilizable después en DFS-R.
-- [ ] Acciones sobre rootDSE (modify sobre la raíz, MS-ADTS 3.1.1.3.3):
+- [x] Lectura del árbol completo + lista con columnas propias.
+- [x] Alta/baja de sitios, subredes (con validación de CIDR) y vínculos (coste, intervalo, notificación, compresión). Puentes: pendiente.
+- [x] Mover servidor entre sitios.
+- [x] Marcar/desmarcar catálogo global.
+- [x] Ver conexiones del KCC, habilitarlas y deshabilitarlas; crear conexiones manuales por IPC.
+- [x] Editor de `schedule` (188 bytes) con arrastre, reutilizado en DFS-R. Round-trip verificado.
+- [x] Acciones sobre rootDSE (MS-ADTS 3.1.1.3.3):
       `replicateSingleObject`, `schemaUpdateNow`, `doGarbageCollection`, `invalidateRidPool`.
       **Limitación conocida:** "Replicar ahora" completo es DRSUAPI (RPC), no LDAP; con
       `replicateSingleObject` se cubre el caso puntual, no la sincronización de un NC entero.
 
-### Fase 2 — Dominios y confianzas de Active Directory
+### Fase 2 — Dominios y confianzas de Active Directory  ✅ terminada
 
 **Confianzas:** `CN=System,<defaultNamingContext>`, objetos `trustedDomain`.
 
@@ -184,19 +185,16 @@ más directa de las cuatro.
 `crossRef` (`nCName`, `dnsRoot`, `nETBIOSName`, `msDS-Behavior-Version`) y el atributo
 `uPNSuffixes` del propio contenedor Partitions.
 
-- [ ] Vista de dominios del bosque con nivel funcional por dominio y del bosque.
-- [ ] Lista de confianzas con dirección, tipo y atributos decodificados en texto.
-- [ ] Editar propiedades de una confianza: filtrado de SID, autenticación selectiva
-      (bit 0x10), tipos de cifrado.
-- [ ] ABM de sufijos UPN alternativos (`uPNSuffixes` en Partitions) — se integra con el combo
-      de sufijo del alta de usuario de ADUC.
-- [ ] Elevar nivel funcional de dominio y de bosque (`msDS-Behavior-Version`), con advertencia
-      de irreversibilidad y validación de que todos los DCs lo soporten.
-- [ ] **Limitación a documentar en la UI:** crear, validar o restablecer una confianza requiere
+- [x] Vista de dominios del bosque con nivel funcional por dominio y del bosque.
+- [x] Lista de confianzas con dirección, tipo y atributos decodificados (0 en este dominio: código ejercitado pero sin datos reales).
+- [x] Editar filtrado de SID, autenticación selectiva y tipos de cifrado.
+- [x] ABM de sufijos UPN alternativos. Falta integrarlo con el combo del alta de usuario de ADUC.
+- [x] Elevar nivel funcional de dominio y de bosque, con confirmación escrita y el máximo que soportan los DC.
+- [x] **Limitación documentada en la UI:** crear, validar o restablecer una confianza requiere
       LSA RPC (MS-LSAD). Sólo se administra lo que vive en el directorio; para lo demás,
       mostrar el comando `netdom`/`New-ADTrust` equivalente y que el usuario lo corra.
 
-### Fase 3 — Administración de DFS
+### Fase 3 — Administración de DFS  ✅ terminada
 
 **Espacios de nombres basados en dominio (v2, modo Windows 2008+)** —
 `CN=DfsRoots,CN=Dfs-Configuration,CN=System,<dominio>`:
@@ -219,12 +217,11 @@ formato mucho más incómodo. **Alcance sugerido: sólo lectura en v1.**
 (`msDFSR-RootPath`, `msDFSR-StagingPath`, `msDFSR-Enabled`, `msDFSR-ReadOnly`,
 `msDFSR-ConflictPath`).
 
-- [ ] Árbol de espacios de nombres v2 con carpetas y destinos.
-- [ ] Parser + serializador de `msDFS-TargetListv2`.
-- [ ] ABM de carpetas y destinos, prioridad y estado (habilitado/deshabilitado) de cada destino.
-- [ ] Grupos de replicación: topología, miembros, conexiones, programación (reusar el editor de
-      `schedule` de la Fase 1), cuota de staging.
-- [ ] **Limitación:** crear un espacio de nombres nuevo es MS-DFSNM (RPC contra el servidor).
+- [x] Árbol de espacios de nombres (v1 y v2) con carpetas y destinos.
+- [x] Parser + serializador de `msDFS-TargetListv2`, y **parser del blob `pKT` de v1**, verificado contra los tres espacios de nombres del dominio (raíz, vínculos, destinos y estado en línea).
+- [x] ABM de carpetas y destinos en v2; v1 en sólo lectura, con aviso en la UI.
+- [x] Grupos de replicación: miembros, rutas replicadas y de staging, conexiones, programación.
+- [x] **Limitación documentada en la UI:** crear un espacio de nombres nuevo es MS-DFSNM (RPC contra el servidor).
       Editar los que ya existen sí es LDAP. Los servidores releen AD por sondeo (hasta 1 h),
       así que hay que avisar que el cambio no es inmediato.
 
@@ -278,6 +275,8 @@ Opciones de transporte:
 
 ```bash
 npm run typecheck                 # los dos proyectos, node y web
+npm run validate                  # 40 verificaciones de sólo lectura contra el DC del perfil
+npm run uitest                    # abre las 4 consolas, conecta y captura pantallas
 npm run build                     # electron-vite
 npm run dist                      # + electron-builder + repack del AppImage
 

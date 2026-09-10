@@ -68,13 +68,31 @@ export default function App(): JSX.Element {
 
   useEffect(() => {
     void (async () => {
-      const [p, t] = await Promise.all([window.adeep.store.prefs(), window.adeep.theme.get()])
-      if (p.ok && p.data) set({ prefs: p.data })
+      const p = await window.adeep.store.prefs().catch(() => null)
+      if (p?.ok && p.data) set({ prefs: p.data })
+      const t = await window.adeep.theme.get().catch(() => 'light' as const)
       set({ theme: t })
+
+      // Otra consola puede haber abierto ya la sesión: todas comparten la conexión.
+      const info = await window.adeep.session.info().catch(() => null)
+      if (info?.ok && info.data?.connected) onConnected(info.data)
     })()
-    const off = window.adeep.theme.onChange((t) => set({ theme: t }))
-    return () => { off() }
-  }, [set])
+
+    const offTheme = window.adeep.theme.onChange((t) => set({ theme: t }))
+    const offSession = window.adeep.session.onChange((info) => {
+      if (info.connected) onConnected(info)
+      else {
+        set({
+          session: { connected: false }, tree: [], items: [], selection: [],
+          selectedDN: null, view: null, statusText: ''
+        })
+        setDialog({ t: 'connect' })
+      }
+    })
+    return () => { offTheme(); offSession() }
+    // Sólo al montar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)

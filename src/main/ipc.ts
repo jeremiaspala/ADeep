@@ -10,6 +10,8 @@ import {
 } from './ldap/directory'
 import * as ops from './ldap/operations'
 import * as store from './store'
+import { registerConsoleIpc } from './ipc-consoles'
+import { broadcast } from './windows'
 import { SDFlagsControl } from './ldap/controls'
 import { buildSecurityDescriptor, parseSecurityDescriptor, SD_FLAGS } from './ldap/sddl'
 import {
@@ -69,16 +71,21 @@ export function registerIpc(): void {
   /* ---------------- Sesión ---------------- */
 
   handle('session.connect', async (profile: ConnectionProfile, password: string) => {
+    // Todas las consolas abiertas comparten la conexión: hay que avisarles.
     if (conn) { await conn.disconnect(); conn = null }
     conn = await AdConnection.connect({ ...profile }, password)
     await store.touchProfile(profile.id).catch(() => undefined)
-    return sessionInfo()
+    const info = sessionInfo()
+    broadcast('session.changed', info)
+    return info
   })
 
   handle('session.disconnect', async () => {
     if (conn) await conn.disconnect()
     conn = null
-    return sessionInfo()
+    const info = sessionInfo()
+    broadcast('session.changed', info)
+    return info
   })
 
   handle('session.info', () => sessionInfo())
@@ -523,6 +530,8 @@ export function registerIpc(): void {
   handle('util.splitDN', (dn: string) => splitDN(dn))
   handle('util.rdnValue', (dn: string) => rdnValue(dn))
   handle('util.filetime', (v: string) => filetimeToDate(v)?.toISOString() ?? null)
+
+  registerConsoleIpc(handle, requireConn)
 }
 
 export function currentConnection(): AdConnection | null {

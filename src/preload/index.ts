@@ -1,9 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppResult, AttributeValue, ConnectionProfile, CreateComputerInput, CreateContactInput,
-  CreateGroupInput, CreateOUInput, CreateUserInput, DirEntry, DomainControllerInfo,
-  FsmoRoles, GroupMembership, Modification, PasswordPolicy, Preferences, SavedQuery,
-  SearchRequest, SearchResult, SecurityDescriptor, SessionInfo
+  CreateGroupInput, CreateOUInput, CreateUserInput, DfsNamespace, DfsTarget, DfsrGroup,
+  DirEntry, DomainControllerInfo, DsaServerInfo, ForestInfo, FsmoRoles, GroupMembership,
+  Modification, PartitionInfo, PasswordPolicy, Preferences, SavedQuery, SearchRequest,
+  SearchResult, SecurityDescriptor, SessionInfo, SiteInfo, SiteLinkInfo, SubnetInfo,
+  TrustInfo
 } from '../shared/types'
 
 const call = <T>(channel: string, ...args: unknown[]): Promise<AppResult<T>> =>
@@ -18,6 +20,11 @@ export type { Preferences }
 
 const api = {
   session: {
+    onChange: (cb: (info: SessionInfo) => void) => {
+      const listener = (_e: unknown, info: SessionInfo): void => cb(info)
+      ipcRenderer.on('session.changed', listener)
+      return () => ipcRenderer.removeListener('session.changed', listener)
+    },
     connect: (profile: ConnectionProfile, password: string) =>
       call<SessionInfo>('session.connect', profile, password),
     disconnect: () => call<SessionInfo>('session.disconnect'),
@@ -130,6 +137,10 @@ const api = {
   },
 
   app: {
+    /** Consola que dibuja esta ventana (la inyecta el proceso principal). */
+    consoleId: (process.argv.find((a) => a.startsWith('--adeep-console=')) ?? '').split('=')[1] || 'aduc',
+    openConsole: (id: string) => ipcRenderer.invoke('app.openConsole', id) as Promise<boolean>,
+    consoles: () => ipcRenderer.invoke('app.consoles') as Promise<{ id: string; title: string }[]>,
     copy: (text: string) => call<boolean>('app.copy', text),
     exportCsv: (rows: string[][], name: string) => call<string | null>('app.exportCsv', rows, name),
     exportLdif: (entries: { dn: string; attrs: Record<string, string[]> }[], name: string) =>
@@ -137,6 +148,74 @@ const api = {
     openExternal: (url: string) => call<boolean>('app.openExternal', url),
     confirm: (title: string, message: string, detail?: string) =>
       call<boolean>('app.confirm', title, message, detail)
+  },
+
+  sites: {
+    list: () => call<SiteInfo[]>('sites.list'),
+    subnets: () => call<SubnetInfo[]>('sites.subnets'),
+    links: () => call<SiteLinkInfo[]>('sites.links'),
+    servers: (siteDN?: string) => call<DsaServerInfo[]>('sites.servers', siteDN),
+    create: (name: string, description?: string) => call<string>('sites.create', name, description),
+    delete: (dn: string) => call<boolean>('sites.delete', dn),
+    createSubnet: (cidr: string, siteDN: string, location?: string, description?: string) =>
+      call<string>('sites.createSubnet', cidr, siteDN, location, description),
+    setSubnetSite: (dn: string, siteDN: string | null) =>
+      call<boolean>('sites.setSubnetSite', dn, siteDN),
+    validateSubnet: (cidr: string) => call<string | null>('sites.validateSubnet', cidr),
+    createLink: (
+      name: string, siteDNs: string[], cost: number, replInterval: number, transport: 'IP' | 'SMTP'
+    ) => call<string>('sites.createLink', name, siteDNs, cost, replInterval, transport),
+    updateLink: (dn: string, patch: {
+      cost?: number; replInterval?: number; siteDNs?: string[]; notify?: boolean
+      noCompression?: boolean; description?: string; schedule?: boolean[] | null
+    }) => call<boolean>('sites.updateLink', dn, patch),
+    setGlobalCatalog: (ntdsDN: string, enabled: boolean) =>
+      call<boolean>('sites.setGlobalCatalog', ntdsDN, enabled),
+    moveServer: (serverDN: string, siteDN: string) =>
+      call<string>('sites.moveServer', serverDN, siteDN),
+    createConnection: (toNtdsDN: string, fromNtdsDN: string, name?: string) =>
+      call<string>('sites.createConnection', toNtdsDN, fromNtdsDN, name),
+    setConnectionEnabled: (dn: string, enabled: boolean) =>
+      call<boolean>('sites.setConnectionEnabled', dn, enabled),
+    deleteConnection: (dn: string) => call<boolean>('sites.deleteConnection', dn),
+    setKcc: (siteDN: string, intraOff: boolean, interOff: boolean) =>
+      call<boolean>('sites.setKcc', siteDN, intraOff, interOff),
+    rootDseOperation: (operation: string, value?: string) =>
+      call<boolean>('sites.rootDseOperation', operation, value),
+    replicateObject: (objectDN: string, sourceInvocationId: string) =>
+      call<boolean>('sites.replicateObject', objectDN, sourceInvocationId)
+  },
+
+  trusts: {
+    forest: () => call<ForestInfo>('trusts.forest'),
+    list: () => call<TrustInfo[]>('trusts.list'),
+    partitions: () => call<PartitionInfo[]>('trusts.partitions'),
+    update: (dn: string, patch: { sidFiltering?: boolean; selectiveAuth?: boolean; encryptionTypes?: number }) =>
+      call<boolean>('trusts.update', dn, patch),
+    setUpnSuffixes: (suffixes: string[]) => call<boolean>('trusts.setUpnSuffixes', suffixes),
+    setSpnSuffixes: (suffixes: string[]) => call<boolean>('trusts.setSpnSuffixes', suffixes),
+    raiseDomainLevel: (level: number) => call<boolean>('trusts.raiseDomainLevel', level),
+    raiseForestLevel: (level: number) => call<boolean>('trusts.raiseForestLevel', level),
+    maxSupportedLevel: () => call<number>('trusts.maxSupportedLevel')
+  },
+
+  dfs: {
+    namespaces: () => call<DfsNamespace[]>('dfs.namespaces'),
+    replicationGroups: () => call<DfsrGroup[]>('dfs.replicationGroups'),
+    setFolderTargets: (linkDN: string, targets: DfsTarget[]) =>
+      call<boolean>('dfs.setFolderTargets', linkDN, targets),
+    setFolderComment: (linkDN: string, comment: string) =>
+      call<boolean>('dfs.setFolderComment', linkDN, comment),
+    setFolderTtl: (linkDN: string, ttl: number) => call<boolean>('dfs.setFolderTtl', linkDN, ttl),
+    createFolder: (namespaceDN: string, path: string, targets: DfsTarget[], comment?: string) =>
+      call<string>('dfs.createFolder', namespaceDN, path, targets, comment),
+    deleteFolder: (linkDN: string) => call<boolean>('dfs.deleteFolder', linkDN),
+    setConnectionEnabled: (dn: string, enabled: boolean) =>
+      call<boolean>('dfs.setConnectionEnabled', dn, enabled),
+    setSchedule: (dn: string, schedule: boolean[] | null) =>
+      call<boolean>('dfs.setSchedule', dn, schedule),
+    setMemberEnabled: (subscriptionDN: string, enabled: boolean) =>
+      call<boolean>('dfs.setMemberEnabled', subscriptionDN, enabled)
   },
 
   theme: {
