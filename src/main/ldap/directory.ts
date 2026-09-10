@@ -4,8 +4,9 @@ import { isBinaryAttribute } from './connection'
 import type { AttributeValue, DirEntry, NodeKind } from '../../shared/types'
 import {
   escapeFilter, filetimeToDate, generalizedTimeToDate, guidToString,
-  intervalToDays, rdnValue, sidToString, sidToFilter, splitDN, parseRDN
+  intervalToDays, rdnValue, sidToString, splitDN, parseRDN
 } from './encoding'
+import { guidsFilter, sidsFilter } from './filters'
 import { UAC, UAC_COMPUTED, SAM_ACCOUNT_TYPE, INSTANCE_TYPE, groupScopeOf, isSecurityGroup } from '../../shared/uac'
 import { resolveWellKnownSid, EXTENDED_RIGHTS } from './wellknown'
 
@@ -343,10 +344,8 @@ export async function resolveSids(conn: AdConnection, sids: string[]): Promise<R
   const CHUNK = 40
   for (let i = 0; i < pending.length; i += CHUNK) {
     const chunk = pending.slice(i, i + CHUNK)
-    const filter = `(|${chunk.map((s) => {
-      try { return `(objectSid=${sidToFilter(s)})` } catch { return '' }
-    }).join('')})`
-    if (filter === '(|)') continue
+    const filter = sidsFilter(chunk)
+    if (!filter) continue
     try {
       const found = await conn.searchRaw(conn.baseDN, {
         scope: 'sub',
@@ -406,14 +405,12 @@ export async function resolveSchemaGuids(
   const stillPending = pending.filter((g) => !out[g])
   if (stillPending.length) {
     try {
-      const { guidToFilter } = await import('./encoding')
-      const schema = await conn.searchRaw(conn.schemaDN, {
+      const filter = guidsFilter(stillPending, 'schemaIDGUID')
+      const schema = filter ? await conn.searchRaw(conn.schemaDN, {
         scope: 'one',
-        filter: `(|${stillPending.map((g) => {
-          try { return `(schemaIDGUID=${guidToFilter(g)})` } catch { return '' }
-        }).join('')})`,
+        filter,
         attributes: ['schemaIDGUID', 'lDAPDisplayName', 'cn', 'objectClass']
-      })
+      }) : []
       for (const e of schema) {
         const buf = firstBuffer(e, 'schemaIDGUID')
         if (!buf || buf.length !== 16) continue

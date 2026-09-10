@@ -1,6 +1,6 @@
 /** Conexión a un controlador de dominio y operaciones LDAP crudas. */
 import { Client, Attribute, Change, Control } from 'ldapts'
-import type { Entry } from 'ldapts'
+import type { Entry, Filter } from 'ldapts'
 import type { ConnectionProfile, RootDSE } from '../../shared/types'
 import { escapeFilter, sidToString, guidToString } from './encoding'
 import { OID, PermissiveModifyControl, ShowDeletedControl, ShowRecycledControl, TreeDeleteControl } from './controls'
@@ -44,7 +44,8 @@ export interface RawEntry {
 
 export interface SearchOpts {
   scope?: 'base' | 'one' | 'sub'
-  filter?: string
+  /** Los filtros con valores binarios (SID/GUID) deben ser Filter, no string: ver ldap/filters.ts. */
+  filter?: string | Filter
   attributes?: string[]
   sizeLimit?: number
   pageSize?: number

@@ -7,7 +7,11 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()],
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') }
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          // Arnés de validación de sólo lectura: `npm run validate`.
+          validate: resolve(__dirname, 'src/main/validate.ts')
+        }
       }
     }
   },

@@ -13,9 +13,9 @@ import * as store from './store'
 import { SDFlagsControl } from './ldap/controls'
 import { buildSecurityDescriptor, parseSecurityDescriptor, SD_FLAGS } from './ldap/sddl'
 import {
-  dnToCanonical, escapeFilter, filetimeToDate, guidToFilter, parentDN,
-  rdnValue, sidToFilter, splitDN
+  dnToCanonical, escapeFilter, filetimeToDate, parentDN, rdnValue, splitDN
 } from './ldap/encoding'
+import { guidFilter, sidFilter } from './ldap/filters'
 import type {
   AppResult, ConnectionProfile, CreateComputerInput, CreateContactInput, CreateGroupInput,
   CreateOUInput, CreateUserInput, DirEntry, Preferences, SavedQuery, SearchRequest,
@@ -194,7 +194,7 @@ export function registerIpc(): void {
   handle('search.bySid', async (sid: string) => {
     const c = requireConn()
     const raw = await c.searchRaw(c.baseDN, {
-      scope: 'sub', filter: `(objectSid=${sidToFilter(sid)})`, attributes: LIST_ATTRS
+      scope: 'sub', filter: sidFilter(sid), attributes: LIST_ATTRS
     })
     return raw[0] ? toDirEntry(raw[0], true) : null
   })
@@ -202,7 +202,7 @@ export function registerIpc(): void {
   handle('search.byGuid', async (guid: string) => {
     const c = requireConn()
     const raw = await c.searchRaw(c.baseDN, {
-      scope: 'sub', filter: `(objectGUID=${guidToFilter(guid)})`, attributes: LIST_ATTRS
+      scope: 'sub', filter: guidFilter(guid), attributes: LIST_ATTRS
     })
     return raw[0] ? toDirEntry(raw[0], true) : null
   })

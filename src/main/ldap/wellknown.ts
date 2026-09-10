@@ -221,5 +221,7 @@ export const WELL_KNOWN_CONTAINERS: Record<string, string> = {
   '6227f0af1fc2410d8e3bb10615bb5b0f': 'NTDS Quotas',
   '09460c08ae1e4a4ea0f64aee7daa1e5a': 'Program Data',
   'ab1d30f3768811d1aded00c04fd8d5cd': 'System',
-  '1eb93889e40c45df9f0c8f3f52c23ac9': 'Managed Service Accounts'
+  '1eb93889e40c45df9f0c64d23bbb6237': 'Managed Service Accounts',
+  'f4be92a4c777485e878e9421d53087db': 'Microsoft Program Data',
+  '683a24e2e8164bd3af86ac3c2cf3f981': 'Keys'
 }

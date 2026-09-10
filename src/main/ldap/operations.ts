@@ -7,6 +7,7 @@ import {
   rdnValue, sidToString, splitDN, parseRDN, dnToDomain
 } from './encoding'
 import { UAC, buildGroupType, setFlag } from '../../shared/uac'
+import { WELL_KNOWN_CONTAINERS } from './wellknown'
 import type {
   CreateComputerInput, CreateContactInput, CreateGroupInput, CreateOUInput,
   CreateUserInput, DirEntry, FsmoRoles, GroupMembership, PasswordPolicy
@@ -300,11 +301,11 @@ export async function getMemberOf(conn: AdConnection, dn: string): Promise<Group
   const pgid = firstNumber(e, 'primaryGroupID')
   if (pgid && conn.domainSID) {
     const sid = `${conn.domainSID}-${pgid}`
-    const { sidToFilter } = await import('./encoding')
+    const { sidFilter } = await import('./filters')
     try {
       const g = await conn.searchRaw(conn.baseDN, {
         scope: 'sub',
-        filter: `(objectSid=${sidToFilter(sid)})`,
+        filter: sidFilter(sid),
         attributes: ['name', 'objectClass']
       })
       if (g[0]) {
@@ -675,7 +676,10 @@ export async function getWellKnownContainers(conn: AdConnection): Promise<Record
     const s = Buffer.isBuffer(v) ? v.toString('utf8') : String(v)
     // Formato: B:32:<guid hex>:<DN>
     const m = /^B:32:([0-9a-fA-F]{32}):(.*)$/.exec(s)
-    if (m) out[m[1].toLowerCase()] = m[2]
+    if (!m) continue
+    const guid = m[1].toLowerCase()
+    // La UI quiere nombres ("Users", "Computers"), no el GUID del wellKnownObject.
+    out[WELL_KNOWN_CONTAINERS[guid] ?? guid] = m[2]
   }
   return out
 }

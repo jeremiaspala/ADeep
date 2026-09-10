@@ -34,11 +34,6 @@ export function stringToSid(sid: string): Buffer {
   return buf
 }
 
-/** SID → filtro LDAP escapado (\XX por byte). */
-export function sidToFilter(sid: string): string {
-  return [...stringToSid(sid)].map((b) => '\\' + b.toString(16).padStart(2, '0')).join('')
-}
-
 /** objectGUID binario (mixed-endian) → {xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx} */
 export function guidToString(buf: Buffer): string {
   if (!buf || buf.length !== 16) return ''
@@ -59,10 +54,6 @@ export function stringToGuid(guid: string): Buffer {
     b[7], b[6],
     b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]
   ])
-}
-
-export function guidToFilter(guid: string): string {
-  return [...stringToGuid(guid)].map((b) => '\\' + b.toString(16).padStart(2, '0')).join('')
 }
 
 /** FILETIME (100ns desde 1601-01-01 UTC) → Date | null */
