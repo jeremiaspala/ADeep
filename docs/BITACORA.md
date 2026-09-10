@@ -211,6 +211,32 @@ en producción.
 Lo que sigue sin refrescarse solo son los cambios hechos **fuera** de ADeep (otro admin en una
 consola de Windows, un script). Para eso hace falta F5, y es deliberado.
 
+### 14. La lista no se podía desplazar
+
+Jeremías: «si los equipos superan el tamaño de la ventana no tengo scroll para verlos hacia
+abajo». Con 634 usuarios el contenedor `Users` llenaba la lista y el resto quedaba inalcanzable:
+ni barra ni rueda del mouse.
+
+No faltaba el `overflow: auto` —`.grid` y `.tree` ya lo tenían—, faltaba que alguien tuviera
+altura definida. `.app` y `.body` son grids cuyas filas se dimensionan al contenido, y los
+paneles intermedios (`.tree-pane`, `.list-pane`) conservaban el `min-height: auto` que traen por
+defecto los ítems de flex y de grid. Así, la tabla empujaba la fila hacia abajo, el panel crecía
+con ella y `.grid` nunca llegaba a desbordar: no tenía de qué. Lo que recortaba era el
+`overflow: hidden` de `body`, varios niveles más arriba, donde ya no hay a qué engancharle una
+barra.
+
+La corrección es sólo CSS, en `styles/app.css`:
+
+- `.app` y `.body`: `minmax(0, 1fr)` en la fila del cuerpo y `overflow: hidden`, para que la fila
+  no crezca con el contenido.
+- `.tree-pane` y `.list-pane`: `min-height: 0` y `overflow: hidden`.
+- `.tree` y `.grid`: `min-height: 0`, que es lo que habilita el desborde dentro del flex.
+
+Las nueve consolas comparten estas clases a través de `ConsoleShell` y `DetailList`, así que el
+arreglo vale para todas: la lista, y también el árbol, que tenía el mismo defecto y se notaba
+menos porque casi nunca es tan largo. Los encabezados `sticky` de la tabla siguen funcionando
+—ahora de verdad, porque antes no había scroll respecto del cual quedarse fijos—.
+
 ### Lo que quedó pendiente
 
 - **Las escrituras nunca se probaron contra un dominio real.** Las lecturas sí, exhaustivamente.
