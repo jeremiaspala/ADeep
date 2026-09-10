@@ -1,0 +1,33 @@
+appId: ar.com.adeep
+productName: ADeep
+copyright: © 2026 Jeremías Palazzesi
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**
+  - '!**/*.map'
+  - '!node_modules/**/{test,__tests__,tests,example,examples,doc,docs}/**'
+  - '!node_modules/**/*.{md,markdown,ts,map}'
+asar: true
+electronLanguages:
+  - es
+  - en-US
+linux:
+  target:
+    - AppImage
+  icon: build/icon.png
+  category: System
+  synopsis: Administración de Active Directory para Linux
+  description: >-
+    Cliente LDAP nativo para administrar usuarios, grupos, equipos y unidades
+    organizativas de Active Directory sin necesidad de Windows.
+  # electron-builder 25: `desktop` es un mapa plano de claves del .desktop.
+  desktop:
+    Name: ADeep
+    GenericName: Usuarios y equipos de Active Directory
+    Keywords: active directory;ldap;ad;usuarios;grupos;dominio;
+    StartupWMClass: ADeep
+appImage:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+npmRebuild: false

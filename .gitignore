@@ -1,0 +1,11 @@
+node_modules/
+out/
+release/
+dist/
+
+# Se descarga en el postbuild del AppImage.
+build/runtime-x86_64
+
+*.tsbuildinfo
+.DS_Store
+*.log
