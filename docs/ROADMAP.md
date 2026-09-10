@@ -2,7 +2,11 @@
 
 > Documento de continuidad. Si retomás la sesión sin contexto previo, **leé esto primero**
 > y seguí por la fase que esté marcada como en curso.
-> Última actualización: 2026-09-10 (fases 0 a 3 terminadas).
+> Última actualización: 2026-09-10 (fases 0 a 3 terminadas, v0.3.2 publicada).
+
+**El objetivo declarado es rehacer RSAT para Linux desde cero**: una aplicación por
+complemento de MMC, todas con el mismo lenguaje visual y sobre la misma base LDAP.
+Publicadas en https://github.com/jeremiaspala/ADeep/releases
 
 ---
 
@@ -279,6 +283,52 @@ Conclusiones:
   nada: Electron le da un renderer propio a cada ventana igual.
 - Las caches de resolución del directorio (SID → nombre, GUID → clase) tienen techo
   (5000 y 3000 entradas) para que una sesión larga no crezca sin control.
+
+## 3 ter. Empaquetado
+
+`npm run dist` genera **un AppImage por consola** desde una sola carga útil
+(`scripts/appimage-postbuild.mjs`), cada uno con su AppRun (`--console=<id>`), su
+`.desktop` y su ícono. Detalles que ya costaron una sesión y conviene no volver a pisar:
+
+- `StartupWMClass` tiene que ser **`adeep`** en minúscula: es el `WM_CLASS` que reporta
+  Electron. Si no coinciden, el panel no asocia la ventana con el lanzador y muestra un
+  ícono genérico.
+- Los íconos por consola (`build/icons/<id>.png`) van dentro del asar (`files` en
+  `electron-builder.yml`) porque se leen en tiempo de ejecución para `_NET_WM_ICON`.
+  Las cuatro consolas comparten proceso, así que el ícono va por ventana, no por proceso.
+- El postbuild **no usa `/tmp`**: suele ser un tmpfs en RAM y mover cuatro AppImage de
+  94 MB lo llena, al punto de romper hasta las operaciones de git. Trabaja en
+  `release/.build/`.
+- Los cuatro binarios comparten el bloqueo de instancia única de Electron: abrir el segundo
+  con el primero corriendo no levanta otro proceso, le pide al que ya está que abra esa
+  consola. Por eso la sesión LDAP se comparte y se autentica una sola vez.
+
+## 3 quater. Verificación de la interfaz
+
+Además de `npm run validate` (backend, sólo lectura), hay arneses de UI que corren la
+aplicación de verdad y le hacen clic a las cosas:
+
+| Comando | Qué hace |
+|---|---|
+| `npm run uitest` | Abre las cuatro consolas, conecta y captura pantalla de cada una |
+| `npx electron out/main/uitest-audit.js` | Recorre los 63 ítems de menú de las cuatro consolas y verifica que cada uno haga algo |
+| `npx electron out/main/uitest-menu.js` | Regresión puntual: Acción → Nuevo → Usuario abre el diálogo |
+
+La auditoría tiene lista negra de ítems destructivos porque corre contra el dominio
+productivo. Encontró el bug de submenús (ver más abajo) y confirmó que los otros 62 ítems
+funcionan.
+
+**Bugs que encontraron estos arneses**, para que quede claro que valen la pena:
+
+1. Los submenús no funcionaban en ninguna consola: se dibujan en otro portal, el menú padre
+   veía el clic como «afuera» y desmontaba el ítem antes de que llegara el `click`.
+   `Nuevo > Usuario` no hacía nada.
+2. Resolver el HTML del renderer con `__dirname` apuntaba mal: el código compartido se
+   bundlea en `out/main/chunks`.
+3. Un fallo en `theme.get` dejaba la consola entera sin sesión, porque el arranque usaba un
+   `Promise.all`.
+4. Las ventanas de la app empaquetada no tenían ícono: se referenciaba un archivo que no
+   estaba incluido en el asar.
 
 ## 4. Convenciones del proyecto
 
