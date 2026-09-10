@@ -7,6 +7,7 @@ import PreferencesDialog from '../components/PreferencesDialog'
 import AboutDialog from '../components/AboutDialog'
 import { useApp } from '../store'
 import { dnToDomain } from '../lib/format'
+import { CONSOLE_LABELS, consolesMenu as buildConsolesMenu } from './consoles'
 
 /** Las cuatro consolas comparten esta cáscara: menús, toolbar, cuerpo y barra de estado. */
 export interface ShellProps {
@@ -23,15 +24,6 @@ export interface ShellProps {
   onRefresh: () => void
   /** Se llama al conectar y al recuperar una sesión ya abierta en otra consola. */
   onSession: (info: SessionInfo) => void
-}
-
-const CONSOLE_LABELS: Record<string, string> = {
-  aduc: 'Usuarios y equipos',
-  sites: 'Sitios y servicios',
-  trusts: 'Dominios y confianzas',
-  dfs: 'Administración de DFS',
-  dns: 'DNS',
-  dhcp: 'DHCP'
 }
 
 export default function ConsoleShell({
@@ -116,13 +108,7 @@ export default function ConsoleShell({
     if (res.ok) setDialog('connect')
   }
 
-  const consolesMenu: MenuItemDef[] = Object.entries(CONSOLE_LABELS).map(([id, label]) => ({
-    id,
-    label,
-    checked: id === consoleId,
-    disabled: id === consoleId,
-    onSelect: () => void window.adeep.app.openConsole(id)
-  }))
+  const consolesMenu = buildConsolesMenu(consoleId)
 
   const allMenus: Record<string, MenuItemDef[]> = {
     Archivo: [

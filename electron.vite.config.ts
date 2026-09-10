@@ -16,7 +16,8 @@ export default defineConfig({
           'uitest-menu': resolve(__dirname, 'src/main/uitest-menu.ts'),
           'uitest-audit': resolve(__dirname, 'src/main/uitest-audit.ts'),
           'uitest-export': resolve(__dirname, 'src/main/uitest-export.ts'),
-          'uitest-about': resolve(__dirname, 'src/main/uitest-about.ts')
+          'uitest-about': resolve(__dirname, 'src/main/uitest-about.ts'),
+          'uitest-switch': resolve(__dirname, 'src/main/uitest-switch.ts')
         }
       }
     }

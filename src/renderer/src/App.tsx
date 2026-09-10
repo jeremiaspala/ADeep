@@ -3,7 +3,7 @@ import {
   Search, RefreshCw, ArrowUp, Trash2, Pencil, Settings2, UserPlus, Users, FolderPlus,
   Sparkles, Plug, PlugZap, Info, ListFilter, Building2, Copy, Scissors, ClipboardPaste,
   KeyRound, Ban, CircleCheck, Unlock, FileDown, SlidersHorizontal, Boxes, Monitor,
-  Contact as ContactIcon, ScrollText, MoveRight, ShieldCheck, PanelsTopLeft
+  Contact as ContactIcon, ScrollText, MoveRight, ShieldCheck, PanelsTopLeft, LayoutGrid
 } from 'lucide-react'
 import type { DirEntry, SessionInfo } from '@shared/types'
 import { useApp } from './store'
@@ -27,6 +27,7 @@ import {
   renameObject, selectedEntries, setEnabled, unlock
 } from './lib/objectActions'
 import { dnToDomain } from './lib/format'
+import { consolesMenu } from './shell/consoles'
 
 type Dialog =
   | { t: 'connect' }
@@ -369,6 +370,7 @@ export default function App(): JSX.Element {
         }
       }
     ],
+    Consolas: consolesMenu('aduc'),
     Herramientas: [
       { id: 'domain', label: 'Información del dominio…', icon: <Building2 size={15} />, disabled: !session.connected, onSelect: () => setDialog({ t: 'domain' }) },
       { id: 'attrs', label: 'Editor de atributos…', icon: <PanelsTopLeft size={15} />, disabled: !one, onSelect: () => one && openProps(one.dn, 'attributes') },
@@ -472,6 +474,17 @@ export default function App(): JSX.Element {
             onChange={(e) => set({ quickFilter: e.target.value })}
           />
         </div>
+        <span className="vsep" />
+        <button
+          className="tool"
+          title="Abrir otra consola"
+          onClick={(e) => {
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setCtx({ items: consolesMenu('aduc'), x: r.left - 140, y: r.bottom + 4 })
+          }}
+        >
+          <LayoutGrid size={16} />
+        </button>
       </div>
 
       <div className="body">
