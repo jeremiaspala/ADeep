@@ -2,7 +2,7 @@
 
 > Documento de continuidad. Si retomás la sesión sin contexto previo, **leé esto primero**
 > y seguí por la fase que esté marcada como en curso.
-> Última actualización: 2026-09-10 (nueve consolas, v0.5.0 publicada).
+> Última actualización: 2026-09-14 — v0.6.0 (diez consolas; Hyper-V y DNS terminadas, con revisión de seguridad).
 > El historial de lo hecho está en [`BITACORA.md`](BITACORA.md).
 
 **El objetivo declarado es rehacer RSAT para Linux desde cero**: una aplicación por
@@ -139,7 +139,9 @@ registro central.
 - [x] Round-trip del descriptor de seguridad verificado sobre los **14 848 objetos** del
       dominio: sin pérdida semántica (la diferencia de bytes es relleno del DC).
 - [x] Shell compartido (`src/renderer/src/shell/`) y ventanas por consola.
-- [ ] Pendiente: probar las **escrituras** en un lab.
+- [ ] Pendiente: probar las **escrituras** en un lab. Contra producción se ejecutaron dos:
+      un `displayName` desde la UI (2026-09-10) y `hyperv.setDelegation` con respaldo
+      (2026-09-14). El resto sigue sin ejercitar.
 - [ ] Pendiente: migrar ADUC a `ConsoleShell`.
 
 ### Fase 1 — Sitios y servicios de Active Directory  ✅ terminada
@@ -225,6 +227,9 @@ formato mucho más incómodo. **Alcance sugerido: sólo lectura en v1.**
 - [x] Árbol de espacios de nombres (v1 y v2) con carpetas y destinos.
 - [x] Parser + serializador de `msDFS-TargetListv2`, y **parser del blob `pKT` de v1**, verificado contra los tres espacios de nombres del dominio (raíz, vínculos, destinos y estado en línea).
 - [x] ABM de carpetas y destinos en v2; v1 en sólo lectura, con aviso en la UI.
+      **El alta de carpeta llegó tarde:** `dfs.createFolder` existía en el backend desde el
+      principio y la UI nunca lo llamaba; el ítem de menú sólo mostraba un aviso. Lo detectó
+      `uitest-audit` y estuvo marcado como SIN EFECTO varias sesiones antes de corregirse.
 - [x] Grupos de replicación: miembros, rutas replicadas y de staging, conexiones, programación.
 - [x] **Limitación documentada en la UI:** crear un espacio de nombres nuevo es MS-DFSNM (RPC contra el servidor).
       Editar los que ya existen sí es LDAP. Los servidores releen AD por sondeo (hasta 1 h),
@@ -243,10 +248,34 @@ multivaluado `dnsRecord`, un blob binario por registro.
       todos idénticos byte a byte.
 - [x] Árbol de zonas directas e inversas, lista de registros con filtro, alta, edición y baja.
 - [x] Propiedades de zona leídas de `dNSProperty` (actualizaciones dinámicas, envejecimiento,
-      intervalos). **Ojo:** `ALLOW_UPDATE` viene con `dataLength=1` pero el valor igual está
-      en el DWORD; descartar por largo se come esa propiedad.
-- [ ] Pendiente: crear y borrar zonas desde la UI (el backend ya está), reenvío condicional,
-      transferencias de zona y el resto de `dNSProperty`.
+      intervalos). **Ojo:** `ALLOW_UPDATE` viene con `dataLength=1`. No hay que descartarlo por
+      largo, **pero tampoco leer el DWORD entero**: los tres bytes que siguen son basura del DC
+      (`0x92758C02` en vez de `2`). Hay que respetar el `dataLength` declarado.
+- [x] Crear y borrar zonas desde la UI. El alta nace **sin actualizaciones dinámicas**: activarlas
+      es una decisión explícita, no un valor por omisión.
+- [x] `dNSProperty` completo (`src/main/dns/properties.ts`): tipo de zona, servidores maestros y
+      de limpieza, intervalos, y `ALLOW_UPDATE` de lectura **y escritura**.
+- [x] **Reenvío condicional:** se leen como zonas de tipo 4 con sus maestros. Se muestran en la
+      lista y en las propiedades.
+- [x] **Revisión de seguridad** (`dns.review`): actualizaciones dinámicas no seguras, comodines,
+      `wpad`/`isatap`, CNAME conviviendo con otros tipos y punteros colgados (PTR/CNAME/NS/MX/SRV
+      que apuntan a un nombre del que el dominio es autoridad y no existe).
+      **Contra el dominio real: 12 zonas, 1082 registros, 5 observaciones, 2 graves** —
+      `interna-a.local` y `interna-b.local` aceptan actualizaciones dinámicas no seguras.
+- [x] Cambiar `ALLOW_UPDATE` desde la UI, con confirmación escrita para abrir una zona.
+- [x] **Root hints** (`CN=RootDNSServers`, que `listZones` saltea por no ser administrable):
+      se leen los NS y su glue y se contrastan con la lista oficial. Hallazgos por dirección
+      vieja, por servidores faltantes y por copias que no coinciden entre particiones.
+      **Contra el dominio real:** `DomainDnsZones` tiene 7 de 13 servidores y `CN=System` los 13;
+      `b`, `d` y `h` con la IP anterior. Se informa como **medio**, porque los root hints sólo
+      se consultan si el servidor resuelve por su cuenta hasta la raíz, y si usa reenviadores
+      globales —que no están en el directorio— no se usan nunca.
+- [x] Marcar un hallazgo como **intencional** (`shell/FindingList.tsx`): se sigue evaluando pero
+      pasa a una sección aparte. Vive en las preferencias, por `id`. `interna-a.local` y
+      `interna-b.local` aceptan actualizaciones no seguras a propósito.
+- [ ] **No se puede por LDAP:** transferencias de zona, reenviadores globales y la lista de
+      bloqueo de consultas globales son configuración del servicio DNS, no del objeto de AD.
+      La UI lo dice en vez de inventar un hallazgo que no puede verificar.
 
 ### Fase 4 — Consola de administración de DHCP  ◐ parcial
 
@@ -269,6 +298,9 @@ Opciones de transporte:
       así que su DHCP no es de Windows o no está integrado con el dominio.
 - [ ] **DECISIÓN PENDIENTE.** Jeremías pidió expresamente charlar antes de meter WinRM o
       cualquier cosa riesgosa. La consola muestra la tabla de opciones y no toca nada más.
+      **Ahora la decisión pesa el doble:** la consola de Hyper-V (Fase 7) necesita el mismo
+      transporte, y a diferencia del DHCP —que en este dominio no existe— los tres hosts de
+      Hyper-V son reales y ya tienen WinRM prendido. Un cliente WS-Man sirve para las dos.
 - [ ] Autorizar / desautorizar servidores desde la UI (es LDAP, se puede hacer sin decidir nada).
 - [ ] Transporte elegido, con perfil de conexión propio (host, credenciales, puerto).
 - [ ] Árbol: servidor → IPv4/IPv6 → ámbitos → (conjunto de direcciones, concesiones,
@@ -331,8 +363,8 @@ aplicación de verdad y le hacen clic a las cosas:
 
 | Comando | Qué hace |
 |---|---|
-| `npm run uitest` | Abre las cuatro consolas, conecta y captura pantalla de cada una |
-| `npx electron out/main/uitest-audit.js` | Recorre los 63 ítems de menú de las cuatro consolas y verifica que cada uno haga algo |
+| `npm run uitest` | Abre las diez consolas, conecta y captura pantalla de cada una |
+| `npx electron out/main/uitest-audit.js` | Recorre los ítems de menú de las diez consolas y verifica que cada uno haga algo |
 | `npx electron out/main/uitest-menu.js` | Regresión puntual: Acción → Nuevo → Usuario abre el diálogo |
 
 La auditoría tiene lista negra de ítems destructivos porque corre contra el dominio
@@ -364,6 +396,55 @@ funcionan.
       y activa la validación de LDAPS.
 - [ ] Pendiente: permisos de inscripción por plantilla en una vista propia (hoy se ven en la
       pestaña de seguridad), filtrado de seguridad de GPO, y GPMC sobre SYSVOL.
+
+### Fase 7 — Hyper-V  ◐ parcial (todo lo que da LDAP; falta el transporte para las VM)
+
+De Hyper-V, Active Directory guarda el **fabric**, no las máquinas:
+
+| Objeto | Dónde | Qué dice |
+|---|---|---|
+| `serviceConnectionPoint` `CN=Microsoft Hyper-V` | bajo el equipo del host | que el equipo es un host; `serviceBindingInformation` trae el listener de VMConnect (`RDP listener port=2179`) |
+| `serviceConnectionPoint` `CN=Windows Virtual Machine` | bajo el equipo del invitado | que ese equipo del dominio es una VM (lo publican los servicios de integración) |
+| SPN `Microsoft Virtual System Migration Service` | en el host | migración en vivo |
+| SPN `Microsoft Virtual Console Service` | en el host | consola / VMConnect |
+| SPN `Hyper-V Replica Service` | en el host | réplica |
+| SPN `WSMAN` | en el host | WinRM registrado (condición para el transporte que falta) |
+| `msDS-AllowedToDelegateTo` | en el host | a qué otros hosts puede migrar en vivo con Kerberos |
+| SPN `MSServerCluster` | en el CNO | clústeres de conmutación por error |
+
+- [x] Lectura: hosts, servicios publicados, puerto de VMConnect, VM unidas al dominio, clústeres.
+- [x] Matriz de migración en vivo: quién puede migrar hacia quién, y en qué sentido.
+- [x] **Escritura:** delegación restringida de migración en vivo y de réplica
+      (`msDS-AllowedToDelegateTo`), con los mismos SPN que escribe Windows —`CIFS`, `HOST`,
+      `Microsoft Virtual System Migration Service` y, opcional, `Hyper-V Replica Service`— en
+      nombre corto y FQDN. Al guardar se apaga `TRUSTED_FOR_DELEGATION`, porque las dos formas
+      de delegación se excluyen y el DC ignora la lista si está prendida.
+- [x] Revisión del fabric: cuenta deshabilitada, delegación no restringida, migración en un
+      solo sentido, delegación hacia hosts que ya no existen, SPN faltantes.
+- [x] Verificado contra el dominio real: 3 hosts (HOST-A, HOST-B, HOST-C), 8 VM unidas al dominio,
+      0 clústeres, 4 observaciones, 0 graves. **HOST-B está dado de baja** (confirmado por Jeremías):
+      la cuenta deshabilitada y su delegación no restringida son observaciones bajas, la segunda
+      marcada como inerte. Lo que sí importa: **HOST-A y HOST-C siguen delegando hacia HOST-B** y esos SPN
+      sobran. **Ejecutado el 2026-09-14:** `hyperv.setDelegation` sacó a HOST-B de los destinos de
+      HOST-A y HOST-C (16 → 8 SPN en cada uno), con respaldo previo del atributo y verificación
+      releyendo. Es la primera escritura de ADeep que toca **configuración de seguridad** contra
+      producción. Quedan 2 observaciones, las dos bajas y las dos sobre HOST-B.
+- [ ] **Bloqueado por la misma decisión que DHCP:** encender, apagar, migrar, ver discos,
+      conmutadores y puntos de control vive en `root\virtualization\v2` del host, no en LDAP.
+      Los tres hosts ya publican el SPN `WSMAN`, así que **WinRM está prendido** y el camino A de
+      la tabla de DHCP sirve para las dos consolas. La pestaña «Administración de VM» documenta
+      las opciones y no toca nada.
+- [x] **RBCD:** se lee `msDS-AllowedToActOnBehalfOfOtherIdentity`, se parsea el descriptor y se
+      resuelven los SID. Es un camino de escalación conocido (se escribe desde el propio host,
+      sin ser administrador del dominio), así que sale como hallazgo grave si hay alguno.
+- [x] Tipos de cifrado Kerberos (`msDS-SupportedEncryptionTypes`) decodificados, con hallazgo si
+      RC4 sigue habilitado. **HOST-A y HOST-C están en 28 (RC4+AES128+AES256).**
+- [x] Transición de protocolo (`TRUSTED_TO_AUTH_FOR_DELEGATION`) como hallazgo propio.
+- [x] Máquinas virtuales abandonadas: cuentas deshabilitadas y sin iniciar sesión en 90 días,
+      informadas agregadas para no llenar la vista de una fila por VM.
+- [x] Propiedades del host con pestaña de seguridad: en quién confía el host, todo junto.
+- [x] Asociar VCO a su CNO por el dueño del descriptor de seguridad — es la única pista fiable,
+      no hay atributo que los enlace. **Sin ejercitar: este dominio no tiene ningún clúster.**
 
 ### Próximas candidatas
 

@@ -67,6 +67,7 @@ async function main(): Promise<void> {
     ['dfs', 'dfs', ['Archivos']],
     ['dns', 'dns', ['ejemplo.local']],
     ['dhcp', 'dhcp', []],
+    ['hyperv', 'hyperv', ['Hosts']],
     ['ldap', 'ldap', ['Configuración']],
     ['gpo', 'gpo', ['Dónde se aplican', 'Users']],
     ['adcs', 'adcs', ['Plantillas']]

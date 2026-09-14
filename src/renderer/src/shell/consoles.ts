@@ -8,6 +8,7 @@ export const CONSOLE_LABELS: Record<string, string> = {
   dfs: 'Administración de DFS',
   dns: 'DNS',
   dhcp: 'DHCP',
+  hyperv: 'Hyper-V',
   ldap: 'Editor LDAP',
   gpo: 'Directivas de grupo',
   adcs: 'Certificados'

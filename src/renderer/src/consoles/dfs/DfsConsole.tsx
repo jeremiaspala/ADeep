@@ -20,7 +20,6 @@ type Selection =
   | { kind: 'group'; group: DfsrGroup }
 
 export default function DfsConsole(): JSX.Element {
-  const toast = useApp((s) => s.toast)
   const confirm = useConfirm()
 
   const [namespaces, setNamespaces] = useState<DfsNamespace[]>([])
@@ -32,6 +31,7 @@ export default function DfsConsole(): JSX.Element {
   const [dialog, setDialog] = useState<
     | null
     | { t: 'folder'; ns: DfsNamespace; folder: DfsFolder }
+    | { t: 'newFolder' }
     | { t: 'schedule'; title: string; initial?: boolean[]; save: (s: boolean[] | null) => void }
   >(null)
 
@@ -454,7 +454,7 @@ export default function DfsConsole(): JSX.Element {
             {
               id: 'newfolder', label: 'Nueva carpeta…', icon: <Plus size={15} />,
               disabled: !namespaces.some((n) => n.version === 2),
-              onSelect: () => toast('info', 'Elegí un espacio de nombres en modo Windows 2008 para agregarle carpetas.')
+              onSelect: () => setDialog({ t: 'newFolder' })
             },
             { id: 's1', separator: true },
             {
@@ -499,6 +499,15 @@ export default function DfsConsole(): JSX.Element {
       />
 
       {ctx && <MenuPopup items={ctx.items} x={ctx.x} y={ctx.y} onClose={() => setCtx(null)} />}
+
+      {dialog?.t === 'newFolder' && (
+        <NewFolderDialog
+          namespaces={namespaces.filter((n) => n.version === 2)}
+          inicial={selection.kind === 'namespace' ? selection.ns : undefined}
+          onClose={() => setDialog(null)}
+          onCreada={() => { setDialog(null); void load() }}
+        />
+      )}
 
       {dialog?.t === 'folder' && (
         <FolderDialog
@@ -608,6 +617,124 @@ function FolderDialog({
             />
           </Field>
           <button className="btn" onClick={add} disabled={!newTarget.trim().startsWith('\\\\')}>Agregar</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+/**
+ * Alta de carpeta DFS. Sólo en espacios de nombres v2: en v1 los vínculos viven
+ * dentro del blob `pKT` y reescribirlo a ciegas es demasiado riesgo.
+ */
+function NewFolderDialog({
+  namespaces, inicial, onClose, onCreada
+}: {
+  namespaces: DfsNamespace[]
+  inicial?: DfsNamespace
+  onClose: () => void
+  onCreada: () => void
+}): JSX.Element {
+  const elegible = inicial && inicial.version === 2 ? inicial : namespaces[0]
+  const [nsDN, setNsDN] = useState(elegible?.dn ?? '')
+  const [path, setPath] = useState('')
+  const [comment, setComment] = useState('')
+  const [targets, setTargets] = useState<DfsTarget[]>([])
+  const [nuevo, setNuevo] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const ns = namespaces.find((n) => n.dn === nsDN)
+  const limpio = path.trim().replace(/^\\+|\\+$/g, '')
+  const duplicada = !!ns?.folders.some((f) => f.path.toLowerCase() === limpio.toLowerCase())
+  const valido = !!ns && !!limpio && !duplicada && targets.length > 0
+
+  const agregar = (): void => {
+    const p = nuevo.trim()
+    if (!p.startsWith('\\\\')) return
+    const partes = p.replace(/^\\\\/, '').split('\\')
+    if (partes.length < 2 || !partes[1]) return
+    setTargets([...targets, { path: p, server: partes[0], share: partes.slice(1).join('\\'), enabled: true }])
+    setNuevo('')
+  }
+
+  const crear = async (): Promise<void> => {
+    if (!ns) return
+    setBusy(true)
+    const res = await window.adeep.dfs.createFolder(ns.dn, limpio, targets, comment.trim() || undefined)
+    setBusy(false)
+    if (report(res, `Carpeta ${limpio} creada`) !== undefined) onCreada()
+  }
+
+  return (
+    <Modal
+      title="Nueva carpeta DFS"
+      subtitle={ns ? `${ns.path} · modo Windows 2008` : 'No hay espacios de nombres en modo Windows 2008'}
+      icon={<FolderSymlink size={18} color="var(--accent)" />}
+      size="wide"
+      onClose={onClose}
+      footer={
+        <>
+          <div className="spacer" style={{ flex: 1 }} />
+          <button className="btn" onClick={onClose}>Cancelar</button>
+          <button className="btn primary" disabled={!valido || busy} onClick={() => void crear()}>Crear</button>
+        </>
+      }
+    >
+      <div className="col" style={{ gap: 10 }}>
+        <Field label="Espacio de nombres">
+          <select value={nsDN} onChange={(e) => setNsDN(e.target.value)}>
+            {namespaces.map((n) => <option key={n.dn} value={n.dn}>{n.path}</option>)}
+          </select>
+        </Field>
+
+        <Text
+          label="Nombre de la carpeta"
+          value={path}
+          onChange={setPath}
+          placeholder="Informacion o Areas\Sistemas"
+          hint={ns && limpio ? `${ns.path}\\${limpio}` : 'Podés anidar con contrabarras'}
+          autoFocus
+        />
+        {duplicada && (
+          <div className="hint" style={{ color: 'var(--danger)' }}>
+            Ese nombre ya existe en este espacio de nombres.
+          </div>
+        )}
+
+        <Field label="Destinos">
+          <div className="row" style={{ gap: 6 }}>
+            <input
+              value={nuevo}
+              onChange={(e) => setNuevo(e.target.value)}
+              placeholder="\\servidor\recurso"
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregar() } }}
+            />
+            <button className="btn" onClick={agregar} disabled={!nuevo.trim().startsWith('\\\\')}>
+              Agregar
+            </button>
+          </div>
+        </Field>
+
+        {targets.length ? (
+          <div className="chips">
+            {targets.map((t) => (
+              <span key={t.path} className="picker-chip">
+                <span className="mono">{t.path}</span>
+                <button onClick={() => setTargets(targets.filter((x) => x.path !== t.path))}>×</button>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="hint">Hace falta al menos un destino: una carpeta sin destinos no resuelve a nada.</div>
+        )}
+
+        <Text label="Comentario" value={comment} onChange={setComment} placeholder="Opcional" />
+
+        <div className="hint" style={{ lineHeight: 1.5 }}>
+          ADeep crea el objeto en Active Directory. <strong>No comparte la carpeta en el servidor
+          de destino</strong> ni verifica que el recurso exista: si el recurso no está compartido,
+          la carpeta va a resolver a una ruta que no anda. Los servidores releen la configuración
+          por sondeo, así que el cambio puede tardar en verse.
         </div>
       </div>
     </Modal>

@@ -448,6 +448,51 @@ async function main(): Promise<void> {
   await check('dhcp.state', () => dhcpOps.getState(conn),
     (d) => `${d.servers.length} servidor(es) autorizado(s)${d.servers.length ? ': ' + d.servers.map((s) => `${s.name ?? ''} ${s.address}`).join(', ') : ''}; ${d.candidates.length} equipo(s) con SPN de DHCP`)
 
+  await check('dns.review (seguridad, sólo lectura)', () => dnsOps.review(conn),
+    (r) => {
+      const por = (s: string): number => r.issues.filter((i) => i.severity === s).length
+      const graves = r.issues.filter((i) => i.severity === 'alta')
+      const hints = r.rootHints
+        .map((h) => `${h.scopeLabel}: ${h.servers.length}/13${h.servers.filter((x) => x.stale).length ? `, ${h.servers.filter((x) => x.stale).length} con IP vieja` : ''}`)
+        .join(' | ')
+      return `${r.zonesChecked} zonas, ${r.recordsChecked} registros → ${r.issues.length} observación(es) ` +
+        `(${por('alta')} alta, ${por('media')} media, ${por('baja')} baja)` +
+        (graves.length ? ` — GRAVES: ${graves.map((g) => `${g.zone}: ${g.label}`).join(' | ')}` : '') +
+        (hints ? ` · root hints → ${hints}` : '')
+    })
+
+  /* ---------------- Hyper-V ---------------- */
+
+  const hvOps = await import('./hyperv/operations')
+  const hv = await check('hyperv.state', () => hvOps.getState(conn),
+    (d) => `${d.hosts.length} host(s)${d.hosts.length ? ': ' + d.hosts.map((h) => h.name).join(', ') : ''}; ${d.guests.length} VM unida(s) al dominio; ${d.clusters.length} clúster(es); ${d.issues.length} observación(es), ${d.issues.filter((i) => i.severity === 'alta').length} grave(s)`)
+
+  await check('hyperv: SPN de delegación reconstruidos', async () => {
+    // El round-trip que importa: lo que escribiríamos tiene que coincidir con lo
+    // que ya está en msDS-AllowedToDelegateTo de los hosts configurados.
+    const byName = new Map((hv?.hosts ?? []).map((h) => [h.name, h]))
+    const total: string[] = []
+    const faltan: string[] = []
+    for (const h of hv?.hosts ?? []) {
+      if (!h.migratesTo.length) continue
+      const targets = h.migratesTo.map((n) => byName.get(n)).filter((x): x is NonNullable<typeof x> => !!x)
+      const esperados = hvOps.delegationSpns(targets, h.replicatesTo.length > 0)
+      total.push(h.name)
+      for (const spn of esperados) {
+        const cls = spn.slice(0, spn.indexOf('/'))
+        if (cls !== hvOps.SPN_CLASS.migration && cls !== hvOps.SPN_CLASS.replica) continue
+        const destino = spn.slice(spn.indexOf('/') + 1).split('.')[0].toUpperCase()
+        const lista = cls === hvOps.SPN_CLASS.migration ? h.migratesTo : h.replicatesTo
+        if (!lista.some((n) => n.toUpperCase() === destino)) faltan.push(`${h.name} → ${spn}`)
+      }
+    }
+    return { total, faltan }
+  }, (r) => r.faltan.length
+    ? `REVISAR: ${r.faltan.join(' | ')}`
+    : r.total.length
+      ? `${r.total.length} host(s) con delegación, SPN coinciden: ${r.total.join(', ')}`
+      : 'ningún host tiene delegación restringida configurada')
+
   /* ---------------- Navegador LDAP ---------------- */
 
   const browserOps = await import('./ldapbrowser/operations')

@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type {
   AppResult, AttributeValue, ConnectionProfile, CreateComputerInput, CreateContactInput,
   CreateGroupInput, CreateOUInput, CreateUserInput, DfsNamespace, DfsTarget, DfsrGroup,
-  CertificateAuthority, CertificateTemplate, DhcpState, DirEntry, DnsNode, DnsZone,
+  CertificateAuthority, CertificateTemplate, DhcpState, DirEntry, DnsNode, DnsReview, DnsZone, HyperVState,
   DnsZoneDetails, GpoInfo, GpoScope, LdapBrowserNode, LdapContext, WmiFilter,
   DomainControllerInfo, DsaServerInfo, ForestInfo, FsmoRoles, GroupMembership,
   Modification, PartitionInfo, PasswordPolicy, Preferences, SavedQuery, SearchRequest,
@@ -241,11 +241,27 @@ const api = {
     deleteNode: (nodeDN: string) => call<boolean>('dns.deleteNode', nodeDN),
     createZone: (name: string, scope: 'domain' | 'forest' | 'legacy') =>
       call<string>('dns.createZone', name, scope),
-    deleteZone: (zoneDN: string) => call<boolean>('dns.deleteZone', zoneDN)
+    deleteZone: (zoneDN: string) => call<boolean>('dns.deleteZone', zoneDN),
+    setZoneUpdates: (zoneDN: string, value: 0 | 1 | 2) =>
+      call<boolean>('dns.setZoneUpdates', zoneDN, value),
+    review: () => call<DnsReview>('dns.review'),
+    fixRootHints: (zoneDN: string) =>
+      call<{ cambios: string[]; respaldo: { nodeDN: string; base64: string; data: string }[] }>(
+        'dns.fixRootHints', zoneDN
+      )
   },
 
   dhcp: {
     state: () => call<DhcpState>('dhcp.state')
+  },
+
+  hyperv: {
+    state: () => call<HyperVState>('hyperv.state'),
+    setDelegation: (dn: string, targets: { name: string; dnsHostName?: string }[], includeReplica: boolean) =>
+      call<boolean>('hyperv.setDelegation', dn, targets, includeReplica),
+    clearDelegation: (dn: string) => call<boolean>('hyperv.clearDelegation', dn),
+    setUnconstrained: (dn: string, enabled: boolean) =>
+      call<number>('hyperv.setUnconstrained', dn, enabled)
   },
 
   ldapb: {

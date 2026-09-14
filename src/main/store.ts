@@ -21,7 +21,8 @@ const DEFAULT_PREFS: Preferences = {
   language: 'es',
   confirmDelete: true,
   density: 'comfortable',
-  hardwareAcceleration: false
+  hardwareAcceleration: false,
+  acceptedFindings: []
 }
 
 let cache: StoreShape | null = null

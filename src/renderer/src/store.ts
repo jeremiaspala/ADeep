@@ -59,7 +59,8 @@ export const useApp = create<AppState>((set) => ({
     language: 'es',
     confirmDelete: true,
     density: 'comfortable',
-    hardwareAcceleration: false
+    hardwareAcceleration: false,
+    acceptedFindings: []
   },
   theme: 'light',
 

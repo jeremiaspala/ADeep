@@ -50,6 +50,7 @@ export default defineConfig({
           dfs: resolve(__dirname, 'src/renderer/dfs.html'),
           dns: resolve(__dirname, 'src/renderer/dns.html'),
           dhcp: resolve(__dirname, 'src/renderer/dhcp.html'),
+          hyperv: resolve(__dirname, 'src/renderer/hyperv.html'),
           ldap: resolve(__dirname, 'src/renderer/ldap.html'),
           gpo: resolve(__dirname, 'src/renderer/gpo.html'),
           adcs: resolve(__dirname, 'src/renderer/adcs.html')

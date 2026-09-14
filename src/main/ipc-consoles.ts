@@ -9,6 +9,7 @@ import * as trusts from './trusts/operations'
 import * as dfs from './dfs/operations'
 import * as dns from './dns/operations'
 import * as dhcp from './dhcp/operations'
+import * as hyperv from './hyperv/operations'
 import * as browser from './ldapbrowser/operations'
 import * as gpo from './gpo/operations'
 import * as adcs from './adcs/operations'
@@ -178,10 +179,34 @@ export function registerConsoleIpc(handle: HandleFn, requireConn: () => AdConnec
     await dns.deleteZone(requireConn(), zoneDN)
     return true
   })
+  handle('dns.setZoneUpdates', async (zoneDN: string, value: 0 | 1 | 2) => {
+    await dns.setZoneUpdates(requireConn(), zoneDN, value)
+    return true
+  })
+  handle('dns.review', async () => dns.review(requireConn()))
+  handle('dns.fixRootHints', async (zoneDN: string) => dns.fixRootHints(requireConn(), zoneDN))
 
   /* ---------------- DHCP ---------------- */
 
   handle('dhcp.state', async () => dhcp.getState(requireConn()))
+
+  /* ---------------- Hyper-V ---------------- */
+
+  handle('hyperv.state', async () => hyperv.getState(requireConn()))
+  handle('hyperv.setDelegation', async (
+    dn: string,
+    targets: { name: string; dnsHostName?: string }[],
+    includeReplica: boolean
+  ) => {
+    await hyperv.setMigrationDelegation(requireConn(), dn, targets, includeReplica)
+    return true
+  })
+  handle('hyperv.clearDelegation', async (dn: string) => {
+    await hyperv.clearDelegation(requireConn(), dn)
+    return true
+  })
+  handle('hyperv.setUnconstrained', async (dn: string, enabled: boolean) =>
+    hyperv.setUnconstrained(requireConn(), dn, enabled))
 
   /* ---------------- Navegador LDAP ---------------- */
 

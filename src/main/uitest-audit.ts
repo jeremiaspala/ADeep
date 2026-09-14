@@ -205,6 +205,7 @@ async function main(): Promise<void> {
     ['dfs', 'DFS'],
     ['dns', 'DNS'],
     ['dhcp', 'DHCP'],
+    ['hyperv', 'Hyper-V'],
     ['ldap', 'Editor LDAP'],
     ['gpo', 'Directivas de grupo'],
     ['adcs', 'Certificados']

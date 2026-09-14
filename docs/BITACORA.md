@@ -5,6 +5,217 @@ Registro de lo que se hizo, en qué orden y por qué. El plan a futuro está en
 
 ---
 
+## 2026-09-14 (noche) — Un bug propio, los root hints y la basura de siete años
+
+### El bug: `dataLength` no era decorativo
+
+La revisión de DNS mostraba «—» en la política de actualizaciones de cinco zonas de doce.
+No eran zonas raras: `_msdcs`, `interna-d.local`, `interna-c.local` y dos inversas. El valor que salía
+era `2457177090`, `2049703938`, `4177167618`, `258`, `3307643394`.
+
+En hexadecimal se ve solo: `0x92758C02`, `0x7A2C0002`, `0xF8FA8502`, `0x00000102`,
+`0xC526A202`. **Todos terminan en `02`.** El valor real es 2 en los cinco casos.
+
+`ALLOW_UPDATE` viene con `dataLength = 1`, y los tres bytes que siguen **no son relleno en
+cero**: son basura del DC. El código leía el DWORD completo. El comentario del roadmap decía
+«el valor igual está en el DWORD», que es verdad a medias y llevaba justo al error. Ahora
+`readZoneProperties` respeta el `dataLength` declarado y lee 1, 2, 3 o 4 bytes según corresponda.
+
+Es el peor tipo de bug para una herramienta de revisión: no fallaba, **informaba mal**. Cinco
+zonas figuraban como «no se pudo leer la política» cuando en realidad estaban bien configuradas.
+
+### Root hints
+
+`CN=RootDNSServers` estaba explícitamente salteado en `listZones` —no es una zona
+administrable— pero su contenido importa. Al leerlo aparecieron tres cosas:
+
+1. **Dos copias que no coinciden.** `DomainDnsZones` tiene **7** servidores raíz;
+   `CN=System` tiene los 13. Cada servidor usa la de su partición.
+2. **Direcciones viejas.** `b` (cambió en 2023), `d` (2013) y `h` (2015) siguen con la IP
+   anterior en la copia heredada; `b` también en la otra.
+3. Faltan seis servidores en la copia de `DomainDnsZones`: d, h, i, k, l, m.
+
+El hallazgo se informa como **medio, no grave**, y el texto lo aclara: los root hints sólo se
+consultan si el servidor resuelve por su cuenta hasta la raíz. Si tiene reenviadores globales
+—que viven en el servicio DNS, no en el directorio— no se usan nunca, y **desde LDAP no hay
+forma de saber cuál es el caso**. Decirlo vale más que inventar una severidad.
+
+La lista de referencia (`ROOT_SERVERS` en `dns/properties.ts`) queda con la advertencia de
+contrastar contra `https://www.internic.net/domain/named.root` antes de tocar nada: cambia cada
+varios años y una lista vieja en el código es exactamente el problema que se está reportando.
+
+### Los punteros colgados, borrados
+
+Los tres que encontró la revisión, con respaldo en `~/rollback-dns-2026-09-14.json`:
+
+| Zona | Nodo | Qué era |
+|---|---|---|
+| `..TrustAnchors` | `@` | NS → `dc-retirado` — un DC que ya no existe. Quedaron los otros 4 NS |
+| `11.10.12.in-addr.arpa` | `197` | PTR → `equipo-viejo-1`. Era su único registro: se borró el nodo |
+| `8.10.12.in-addr.arpa` | `203` | PTR → `equipo-viejo-2`. Ídem |
+
+Antes de borrar se verificó que los tres nombres no existieran **ni en el directorio ni en
+ninguna zona DNS**. El caso de `dc-retirado` se miró aparte porque un NS no es un PTR: borrar un
+servidor de nombres de una zona es otra cosa. Con 4 NS válidos restantes, era seguro.
+
+### «Es a propósito»
+
+`interna-a.local` y `interna-b.local` aceptan actualizaciones dinámicas no seguras **a propósito**.
+Una revisión que repite todas las veces algo ya decidido se vuelve ruido y se deja de leer; una
+que lo esconde deja de servir para auditar. Se agregó `shell/FindingList.tsx`, compartido por
+las dos revisiones: un hallazgo marcado como intencional **se sigue evaluando** pero pasa a una
+sección aparte, plegada. La lista vive en las preferencias, por `id` del hallazgo.
+
+### DFS: «Nueva carpeta» por fin hace algo
+
+La auditoría de menús venía marcándolo como SIN EFECTO desde hacía sesiones. No era un falso
+positivo: `dfs.createFolder` estaba en el backend y en el preload desde el principio, y **la UI
+nunca lo llamaba** — el ítem sólo mostraba un aviso pidiendo que eligieras un espacio de
+nombres. Ahora abre un diálogo con selector de espacio de nombres (sólo v2), ruta, destinos y
+comentario, con la advertencia de que ADeep crea el objeto en AD pero **no comparte la carpeta
+en el servidor** ni verifica que el recurso exista.
+
+De paso quedó sin uso el `toast` de esa consola y se sacó.
+
+`npm run validate`: 59/59. La revisión de DNS quedó en 6 observaciones (eran 9).
+
+---
+
+## 2026-09-14 (tarde) — Terminar Hyper-V y DNS, con la seguridad adelante
+
+Pedido de Jeremías: cerrar las dos consolas «valorando la seguridad sobre todo». Eso decidió
+qué se construyó y qué no.
+
+### DNS
+
+`dNSProperty` estaba leído a medias. Se separó en `src/main/dns/properties.ts` con las 15
+propiedades de MS-DNSP 2.3.2.1, los dos formatos de lista de direcciones (`DNS_ADDR_ARRAY` nuevo
+y `IP4_ARRAY` viejo, que conviven), y el armador de propiedades de un DWORD para poder escribir.
+
+Con eso salieron gratis el tipo de zona (y por lo tanto los **reenviadores condicionales**, que
+son zonas de tipo 4) y los servidores maestros.
+
+Lo que importa: **`dns.review`**. Contra el dominio real, 12 zonas y 1082 registros → 5
+observaciones, **2 graves**: `interna-a.local` y `interna-b.local` aceptan **actualizaciones
+dinámicas no seguras**, o sea que cualquiera que llegue al DNS puede pisar cualquier registro de
+esas zonas sin autenticarse. Las otras tres son punteros colgados: `dc-retirado`, `equipo-viejo-1` y `equipo-viejo-2`,
+exactamente la misma clase de problema que el PTR de `equipo-retirado` que se corrigió a mano esta mañana.
+
+Decisión deliberada: **la revisión no se pronuncia sobre las transferencias de zona ni sobre los
+reenviadores globales.** No están en el directorio —son configuración del servicio DNS— y un
+hallazgo que no se puede verificar es peor que ninguno. La UI lo dice explícitamente en vez de
+dejar el hueco.
+
+El alta de zona nace **sin actualizaciones dinámicas**, y abrir una zona a las no seguras pide
+confirmación escrita. Cerrarla no: bajar el privilegio no necesita ceremonia.
+
+### Hyper-V
+
+Se agregó lo que faltaba mirar en materia de confianza:
+
+- **RBCD** (`msDS-AllowedToActOnBehalfOfOtherIdentity`): se parsea el descriptor y se resuelven
+  los SID. Vale la pena porque se escribe desde el propio host, sin ser administrador del
+  dominio: es de los pocos atributos donde un atacante deja huella y nadie mira.
+- **Cifrados Kerberos** decodificados. HOST-A y HOST-C están en 28 — RC4 habilitado.
+- **Transición de protocolo** como hallazgo aparte de la delegación no restringida.
+- **VM abandonadas**, agregadas en un solo hallazgo en vez de una fila por máquina.
+- Propiedades del host con pestaña de seguridad, que junta todo en un lugar.
+- VCO ↔ CNO por el dueño del descriptor. Sin ejercitar: no hay clústeres en este dominio, y
+  queda dicho en el código y en el roadmap en vez de pasar por probado.
+
+Un detalle de criterio que ya había aparecido con HOST-B: la columna de seguridad mostraba «sin
+observaciones» para un host deshabilitado que tiene delegación no restringida. El riesgo no
+desaparece porque la cuenta esté apagada, sólo queda latente. Ahora dice **«no restringida
+(inerte)»**.
+
+### Documentación
+
+Se escribió [`CONFIGURACION.md`](CONFIGURACION.md): requisitos, los tres modos de TLS y cuándo
+usar cada uno, certificados de CA interna, dónde y cómo se guardan las contraseñas, **una tabla
+de qué permiso necesita la cuenta para escribir en cada consola**, la recomendación de no usar
+Domain Admin para el día a día, los límites de lo que no se puede hacer por LDAP y los errores
+frecuentes con los códigos `data XXX` del DC traducidos.
+
+`npm run validate`: 59/59.
+
+---
+
+## 2026-09-14 — Consola de Hyper-V
+
+Décima consola. La pregunta de arranque era si Hyper-V daba para una consola sobre LDAP, así
+que lo primero fue sondear el dominio real antes de escribir nada. Dio más de lo esperado:
+
+- Los hosts publican un `serviceConnectionPoint` `CN=Microsoft Hyper-V` bajo su objeto de
+  equipo, con el listener de VMConnect en `serviceBindingInformation`.
+- **Cada invitado con los servicios de integración publica `CN=Windows Virtual Machine` bajo su
+  propio objeto de equipo.** Eso da el inventario de VM unidas al dominio sin salir de LDAP, que
+  era la parte que parecía imposible.
+- La migración en vivo con Kerberos es `msDS-AllowedToDelegateTo`: se lee y **se escribe**.
+
+Con eso la consola no quedó en el lugar incómodo de DHCP (una pestaña que sólo explica por qué
+no hace nada): lee el fabric entero y tiene una escritura real.
+
+### Lo que encontró en el dominio
+
+3 hosts (HOST-A, HOST-B, HOST-C), 8 VM unidas al dominio, 0 clústeres, 4 observaciones. HOST-A y HOST-C se
+delegan mutuamente. HOST-B está deshabilitado y tiene delegación no restringida.
+
+La primera versión del diagnóstico marcaba las dos cosas de HOST-B como **graves** y acusaba a HOST-A
+y HOST-C de «migración en un solo sentido». Jeremías aclaró que **HOST-B está dado de baja**, y con eso
+el diagnóstico quedaba al revés: lo que importa no es el estado de un host que ya no existe, sino
+que **HOST-A y HOST-C siguen delegando hacia él**. Se recalibró:
+
+- Host deshabilitado → observación baja («fuera de servicio»), no grave.
+- Delegación no restringida en un host deshabilitado → baja, marcada como *inerte*: nadie puede
+  autenticarse contra él, pero volvería a importar si alguien reactiva la cuenta.
+- Delegar hacia un host deshabilitado → media, **informada en el host vivo**, que es donde hay
+  que limpiarla. Reemplaza al falso «migración en un solo sentido».
+
+Queda en 4 observaciones, 0 graves. La lección para las próximas revisiones: un hallazgo tiene
+que apuntar al objeto donde está la acción, no al que tiene el síntoma.
+
+### La limpieza, ejecutada
+
+Jeremías pidió ejecutar la limpieza, así que se corrió `hyperv.setDelegation` sobre HOST-A y HOST-C
+para sacar a HOST-B de sus destinos. No es la primera escritura de ADeep contra producción —el
+2026-09-10 ya se había cambiado un `displayName` desde la UI, ver más abajo—, pero sí la primera
+que toca **configuración de seguridad** (`msDS-AllowedToDelegateTo`) y la primera hecha con
+respaldo previo.
+
+Se hizo con respaldo: el script leyó y guardó los `msDS-AllowedToDelegateTo` previos en
+`~/rollback-hv-delegation-2026-09-14.json` antes de tocar nada, y verificó el resultado
+releyendo el atributo.
+
+| | Antes | Después |
+|---|---|---|
+| HOST-A | 16 SPN (HOST-B + HOST-C) | 8 SPN (sólo HOST-C) |
+| HOST-C | 16 SPN (HOST-B + HOST-A) | 8 SPN (sólo HOST-A) |
+
+Salió limpia, sin sorpresas. `setMigrationDelegation` también apaga `TRUSTED_FOR_DELEGATION`,
+pero ninguno de los dos lo tenía prendido, así que no escribió `userAccountControl`. La revisión
+del fabric bajó de 4 observaciones a 2, las dos bajas y las dos sobre HOST-B.
+
+### Detalles que costaron
+
+- Delegación restringida y no restringida se excluyen: si `TRUSTED_FOR_DELEGATION` está prendido,
+  el DC ignora `msDS-AllowedToDelegateTo`. Por eso `setMigrationDelegation` la apaga al guardar,
+  con confirmación escrita.
+- Los SPN de delegación van con nombre corto **y** FQDN: el cliente puede pedir el ticket con
+  cualquiera de los dos. `npm run validate` verifica que lo que escribiríamos coincide con lo
+  que ya está en los hosts configurados.
+- La columna de servicios publicados con las cuatro palabras enteras no entraba en la grilla;
+  quedó con las iniciales M · C · R · W y el nombre completo en el tooltip.
+
+### Lo que sigue bloqueado
+
+Encender, apagar, migrar o ver puntos de control es WMI del host, no LDAP. Es **la misma
+decisión de transporte que frena DHCP**, pero ahora con más peso: el DHCP de este dominio no
+existe y los tres hosts de Hyper-V sí, y ya publican el SPN `WSMAN`.
+
+`npm run validate`: 58/58.
+
+---
+
 ## 2026-09-10 — De una consola a nueve
 
 Sesión larga. Se empezó con un backend LDAP completo y una interfaz que no existía, y se

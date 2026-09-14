@@ -45,7 +45,7 @@ function fail(err: unknown): AppResult<never> {
  * ventanas que su vista quedó vieja; no hay sondeo, sólo esto.
  */
 export const ESCRITURA =
-  /^(create\.|ldapb\.create$|obj\.(?!.*\.get$)|group\.(add|remove|setPrimary)|security\.write$|sites\.(create|set|move|update|delete|rootDseOperation|replicateObject)|trusts\.(update|set|raise)|dfs\.(set|create|delete)|dns\.(add|replace|delete|create)|gpo\.(link|unlink|set|move))/
+  /^(create\.|ldapb\.create$|obj\.(?!.*\.get$)|group\.(add|remove|setPrimary)|security\.write$|sites\.(create|set|move|update|delete|rootDseOperation|replicateObject)|trusts\.(update|set|raise)|dfs\.(set|create|delete)|dns\.(add|replace|delete|create|setZone|fixRootHints)|gpo\.(link|unlink|set|move)|hyperv\.(set|clear))/
 
 /** Envuelve un handler para que nunca tire una excepción cruzando el puente. */
 export function handle<A extends unknown[], R>(

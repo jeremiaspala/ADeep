@@ -78,6 +78,8 @@ export type NodeKind =
   | 'dfsrRoot' | 'dfsrGroup' | 'dfsrContent' | 'dfsrMember' | 'dfsrConnection'
   // DNS y DHCP
   | 'dnsRoot' | 'dnsZone' | 'dnsReverseZone' | 'dnsRecord' | 'dhcpRoot' | 'dhcpServer'
+  // Hyper-V
+  | 'hvRoot' | 'hvHost' | 'hvGuest' | 'hvCluster' | 'hvDelegation' | 'hvCheck'
   | 'unknown'
 
 export interface DirEntry {
@@ -304,6 +306,12 @@ export interface Preferences {
   density: 'comfortable' | 'compact'
   /** Composición por GPU. Apagada ahorra ~100 MB y esta UI no la necesita. */
   hardwareAcceleration: boolean
+  /**
+   * Hallazgos de las revisiones que ya se miraron y son a propósito. Se siguen
+   * evaluando y se muestran aparte: no se ocultan, se separan de lo que falta
+   * mirar. La clave es el `id` del hallazgo.
+   */
+  acceptedFindings: string[]
 }
 
 export interface AppResult<T> {
@@ -524,6 +532,15 @@ export interface DnsZone {
   scopeLabel: string
   reverse: boolean
   records: number
+  /** MS-DNSP dwZoneType: 1 principal, 2 secundaria, 3 stub, 4 reenvío condicional. */
+  zoneType?: number
+  zoneTypeLabel?: string
+  /** ALLOW_UPDATE crudo: 0 ninguna, 1 insegura, 2 sólo segura. */
+  allowUpdate?: number
+  updates?: string
+  aging: boolean
+  /** Maestros de una zona secundaria, stub o de reenvío condicional. */
+  masterServers: string[]
 }
 
 export interface DnsRecordView {
@@ -553,8 +570,48 @@ export interface DnsZoneDetails {
   aging: boolean
   noRefresh?: number
   refresh?: number
+  allowUpdate?: number
   updates?: string
   zoneType?: number
+  zoneTypeLabel?: string
+  masterServers: string[]
+  scavengingServers: string[]
+}
+
+export interface DnsIssue {
+  id: string
+  severity: 'alta' | 'media' | 'baja'
+  zone: string
+  /** Nombre del registro, si el hallazgo es de uno concreto. */
+  record?: string
+  label: string
+  detail: string
+}
+
+export interface DnsRootHintServer {
+  name: string
+  addresses: string[]
+  /** Dirección vigente según la lista oficial; vacío si el nombre no es un servidor raíz. */
+  expected?: string
+  stale: boolean
+}
+
+export interface DnsRootHints {
+  dn: string
+  /** En qué partición vive esta copia. */
+  scope: 'domain' | 'forest' | 'legacy'
+  scopeLabel: string
+  servers: DnsRootHintServer[]
+  /** Servidores raíz que faltan en esta copia. */
+  missing: string[]
+}
+
+export interface DnsReview {
+  issues: DnsIssue[]
+  /** Nombres revisados, para poder decir sobre qué se pronunció. */
+  zonesChecked: number
+  recordsChecked: number
+  rootHints: DnsRootHints[]
 }
 
 /* ---------------- DHCP ---------------- */
@@ -682,4 +739,93 @@ export interface CertificateAuthority {
   templates: string[]
   subject: string
   flags: number
+}
+
+/* ---------------- Hyper-V ---------------- */
+
+/** Servicios de Hyper-V que un host publica como SPN. */
+export interface HyperVServices {
+  /** `Microsoft Virtual System Migration Service` — migración en vivo. */
+  migration: boolean
+  /** `Microsoft Virtual Console Service` — VMConnect. */
+  console: boolean
+  /** `Hyper-V Replica Service` — réplica. */
+  replica: boolean
+  /** `WSMAN` — WinRM registrado, condición para administrar el host de verdad. */
+  winrm: boolean
+}
+
+export interface HyperVHost {
+  dn: string
+  name: string
+  dnsHostName?: string
+  operatingSystem?: string
+  operatingSystemVersion?: string
+  description?: string
+  location?: string
+  services: HyperVServices
+  /** Existe el punto de conexión `CN=Microsoft Hyper-V` bajo el objeto del equipo. */
+  hasScp: boolean
+  /** Puerto del listener de VMConnect declarado en el SCP (2179 por omisión). */
+  consolePort?: number
+  enabled: boolean
+  /** TRUSTED_FOR_DELEGATION: delegación no restringida. */
+  unconstrained: boolean
+  /** TRUSTED_TO_AUTH_FOR_DELEGATION: delegación con cualquier protocolo. */
+  anyProtocol: boolean
+  /** Hosts a los que puede migrar en vivo con Kerberos. */
+  migratesTo: string[]
+  /** Hosts a los que puede replicar. */
+  replicatesTo: string[]
+  /** Destinos de `msDS-AllowedToDelegateTo` que no son hosts conocidos. */
+  foreignDelegation: string[]
+  /** Quién puede suplantar usuarios contra este host (RBCD). */
+  rbcd: { sid: string; name: string }[]
+  /** `msDS-SupportedEncryptionTypes`: qué cifrados Kerberos acepta. */
+  encryptionTypes?: number
+  encryptionLabels: string[]
+  /** RC4 habilitado: cifrado débil, todavía aceptado por compatibilidad. */
+  rc4Enabled: boolean
+  lastLogon?: string
+  created?: string
+  clusterName?: string
+}
+
+export interface HyperVGuest {
+  dn: string
+  name: string
+  dnsHostName?: string
+  operatingSystem?: string
+  enabled: boolean
+  lastLogon?: string
+  created?: string
+  /** DN del punto de conexión `CN=Windows Virtual Machine`. */
+  scpDN: string
+}
+
+export interface HyperVCluster {
+  dn: string
+  name: string
+  dnsHostName?: string
+  enabled: boolean
+  /**
+   * Nombres virtuales (VCO) del clúster: objetos de equipo cuyo dueño es el CNO.
+   * Sin ejercitar — este dominio no tiene ningún clúster.
+   */
+  virtualNames: string[]
+}
+
+export interface HyperVIssue {
+  id: string
+  severity: 'alta' | 'media' | 'baja'
+  host: string
+  label: string
+  detail: string
+}
+
+export interface HyperVState {
+  hosts: HyperVHost[]
+  guests: HyperVGuest[]
+  clusters: HyperVCluster[]
+  issues: HyperVIssue[]
 }

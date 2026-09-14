@@ -7,7 +7,8 @@ import { app, BrowserWindow, nativeImage, nativeTheme, shell } from 'electron'
 import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
-export type ConsoleId = 'aduc' | 'sites' | 'trusts' | 'dfs' | 'dns' | 'dhcp' | 'ldap' | 'gpo' | 'adcs'
+export type ConsoleId =
+  | 'aduc' | 'sites' | 'trusts' | 'dfs' | 'dns' | 'dhcp' | 'hyperv' | 'ldap' | 'gpo' | 'adcs'
 
 export interface ConsoleDef {
   id: ConsoleId
@@ -60,6 +61,13 @@ export const CONSOLES: Record<ConsoleId, ConsoleDef> = {
     page: 'dhcp.html',
     width: 1240,
     height: 800
+  },
+  hyperv: {
+    id: 'hyperv',
+    title: 'ADeep — Hyper-V',
+    page: 'hyperv.html',
+    width: 1340,
+    height: 840
   },
   ldap: {
     id: 'ldap',

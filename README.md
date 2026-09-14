@@ -1,6 +1,6 @@
 # ADeep
 
-**Administración de Active Directory para Linux.** Un RSAT hecho de cero: nueve consolas con el
+**Administración de Active Directory para Linux.** Un RSAT hecho de cero: diez consolas con el
 mismo lenguaje visual, sobre LDAP nativo, sin Windows y sin una máquina virtual en el medio.
 
 ![Las consolas de ADeep](docs/img/consolas.png)
@@ -15,14 +15,19 @@ mismo lenguaje visual, sobre LDAP nativo, sin Windows y sin una máquina virtual
 | **Sitios y servicios** | Sitios, subredes, vínculos, catálogo global, conexiones del KCC, programación semanal de replicación |
 | **Dominios y confianzas** | Dominios del bosque, particiones, relaciones de confianza, sufijos UPN, niveles funcionales |
 | **Administración de DFS** | Espacios de nombres (v1 y v2) y grupos de replicación DFS-R |
-| **DNS** | Zonas integradas en el directorio, directas e inversas, con alta, edición y baja de registros |
+| **DNS** | Zonas integradas en el directorio, directas e inversas: alta, edición y baja de zonas y registros, actualizaciones dinámicas y revisión de seguridad |
 | **DHCP** | Servidores autorizados en el directorio *(parcial — ver [Límites](#límites-conocidos))* |
+| **Hyper-V** | Hosts, máquinas virtuales unidas al dominio, delegación de migración en vivo y revisión de seguridad del fabric *(parcial — ver [Límites](#límites-conocidos))* |
 | **Editor LDAP** | Acceso crudo a cualquier contexto de nombres: dominio, configuración, esquema y particiones DNS |
 | **Directivas de grupo** | Directivas, dónde se aplica cada una, precedencia, herencia y estado |
 | **Certificados** | Entidades emisoras, plantillas y revisión de seguridad (ESC1, ESC2, ESC3, ESC9) |
 
 Cada consola abre en su propia ventana, como los complementos de MMC, pero **todas comparten
 proceso y una sola sesión LDAP**: te autenticás una vez.
+
+> **Antes de conectarte:** [`docs/CONFIGURACION.md`](docs/CONFIGURACION.md) tiene los requisitos,
+> los modos de TLS, **qué permisos necesita la cuenta para cada consola** y los problemas
+> frecuentes con su solución.
 
 ## Instalación
 
@@ -36,6 +41,7 @@ chmod +x ADeep-*-x86_64.AppImage
 ./ADeep-*-x86_64.AppImage --console=dfs      # DFS
 ./ADeep-*-x86_64.AppImage --console=dns      # DNS
 ./ADeep-*-x86_64.AppImage --console=dhcp     # DHCP
+./ADeep-*-x86_64.AppImage --console=hyperv   # Hyper-V
 ./ADeep-*-x86_64.AppImage --console=ldap     # Editor LDAP
 ./ADeep-*-x86_64.AppImage --console=gpo      # Directivas de grupo
 ./ADeep-*-x86_64.AppImage --console=adcs     # Certificados
@@ -98,7 +104,7 @@ dependencia de runtime. Todo el trabajo sucio está resuelto a mano en el proces
 - **`msDS-TrustForestTrustInfo`** — espacios de nombres de una confianza de bosque.
 - SIDs, GUIDs, FILETIME, DNs, `userAccountControl`, `groupType` y compañía.
 
-Las nueve consolas comparten proceso y **una sola sesión LDAP**. Eso hace que el refresco entre
+Las diez consolas comparten proceso y **una sola sesión LDAP**. Eso hace que el refresco entre
 ventanas salga barato: cuando una consola escribe, el puente IPC avisa a las demás y cada una
 recarga su vista. Sin sondeo — si nadie escribe, no hay tráfico. Los cambios hechos fuera de
 ADeep sí necesitan F5.
@@ -132,7 +138,7 @@ perfil guardado. **Son de sólo lectura**, para poder correrlos sin riesgo:
 
 ```sh
 npm run validate     # 56 verificaciones de sólo lectura contra el DC del perfil
-npm run uitest       # abre las nueve consolas, conecta y captura pantalla
+npm run uitest       # abre las diez consolas, conecta y captura pantalla
 npm run uitest:refresh  # dos consolas: una escribe, la otra recarga sola
 
 npx electron out/main/uitest-audit.js --no-sandbox   # recorre todos los ítems de menú
@@ -160,6 +166,11 @@ Vale más decirlo que descubrirlo en producción:
 - **DHCP está a medias.** De DHCP, Active Directory guarda una sola cosa: la lista de servidores
   autorizados. Ámbitos, concesiones y reservas viven en el servidor y necesitan otro transporte
   (WinRM, MS-DHCPM por RPC, o la API REST de Kea si es Linux). Todavía no está decidido cuál.
+- **Hyper-V administra el fabric, no las máquinas.** Del directorio salen los hosts, en qué
+  puerto escucha VMConnect, qué VM están unidas al dominio y quién puede migrarle a quién; eso
+  se lee y la delegación de migración en vivo se escribe. Encender, apagar, migrar o sacar un
+  punto de control vive en el WMI del host (`root\virtualization\v2`) y necesita el mismo
+  transporte que falta decidir para DHCP.
 - **Crear confianzas** requiere LSA RPC y no se puede por LDAP. Se administran las que ya existen.
 - **Crear espacios de nombres DFS** requiere MS-DFSNM por RPC. Se administran los que ya existen.
 - **El contenido de las directivas de grupo** vive en SYSVOL, no en el directorio. Desde acá se
@@ -169,8 +180,22 @@ Vale más decirlo que descubrirlo en producción:
 - Los servidores DNS y DFS releen su configuración de AD por sondeo, así que un cambio puede
   tardar en verse.
 
-El plan por fases y las decisiones de arquitectura están en [`docs/ROADMAP.md`](docs/ROADMAP.md);
-el historial de lo que se fue haciendo, en [`docs/BITACORA.md`](docs/BITACORA.md).
+## Revisiones de seguridad
+
+Tres consolas traen una vista que sólo lee y no cambia nada:
+
+- **DNS** — zonas con actualizaciones dinámicas no seguras, comodines, `wpad`/`isatap`
+  publicados, CNAME mal formados y punteros colgados.
+- **Hyper-V** — delegación no restringida, RBCD, transición de protocolo, RC4 habilitado,
+  delegación hacia hosts dados de baja y máquinas virtuales abandonadas.
+- **Certificados** — ESC1, ESC2, ESC3 y ESC9 en las plantillas.
+
+## Documentación
+
+- [`docs/CONFIGURACION.md`](docs/CONFIGURACION.md) — requisitos, conexión, TLS, **permisos por
+  consola** y problemas frecuentes.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — el plan por fases y las decisiones de arquitectura.
+- [`docs/BITACORA.md`](docs/BITACORA.md) — el historial de lo que se fue haciendo y por qué.
 
 ## Licencia
 

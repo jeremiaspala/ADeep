@@ -1,6 +1,6 @@
 {
   "name": "adeep",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "description": "ADeep — administración de Active Directory para Linux",
   "main": "./out/main/index.js",
   "author": "Jeremías Palazzesi <jeremiaspalazzesi@gmail.com> (https://fundamenta.ar)",

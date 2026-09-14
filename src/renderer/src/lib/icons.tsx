@@ -3,7 +3,8 @@ import {
   Building2, Boxes, FolderTree, Folder, FolderCog, User, UserRound, Users,
   Monitor, Contact, Printer, HardDrive, Bot, ShieldQuestion, Trash2, FileQuestion,
   Network, Globe, Link2, Server, Cpu, Cable, Handshake, TreePine, Share2,
-  FolderSymlink, HardDriveDownload, RefreshCcw, GitBranch, Waypoints
+  FolderSymlink, HardDriveDownload, RefreshCcw, GitBranch, Waypoints,
+  Layers, ServerCog, MonitorPlay, KeyRound, ShieldAlert
 } from 'lucide-react'
 import type { NodeKind } from '@shared/types'
 
@@ -53,6 +54,12 @@ export const KIND_LABEL: Record<NodeKind, string> = {
   dnsRecord: 'Registro',
   dhcpRoot: 'DHCP',
   dhcpServer: 'Servidor DHCP',
+  hvRoot: 'Hyper-V',
+  hvHost: 'Host de Hyper-V',
+  hvGuest: 'Máquina virtual',
+  hvCluster: 'Clúster de conmutación por error',
+  hvDelegation: 'Delegación de migración en vivo',
+  hvCheck: 'Revisión del fabric',
   unknown: 'Objeto'
 }
 
@@ -102,6 +109,12 @@ const COLORS: Record<NodeKind, string> = {
   dnsRecord: '#7cc0e0',
   dhcpRoot: '#e11d48',
   dhcpServer: '#e07c9e',
+  hvRoot: '#0ea5e9',
+  hvHost: '#0ea5e9',
+  hvGuest: '#5cc2a0',
+  hvCluster: '#b57ce0',
+  hvDelegation: '#e0a53f',
+  hvCheck: '#8b95a3',
   unknown: '#8b95a3'
 }
 
@@ -161,7 +174,14 @@ export function KindIcon({
     case 'dnsRecord': return <FileQuestion {...props} />
     case 'dhcpRoot':
     case 'dhcpServer': return <Server {...props} />
+    case 'hvRoot': return <Layers {...props} />
+    case 'hvHost': return <ServerCog {...props} />
+    case 'hvGuest': return <MonitorPlay {...props} />
+    case 'hvCluster': return <Boxes {...props} />
+    case 'hvDelegation': return <KeyRound {...props} />
+    case 'hvCheck': return <ShieldAlert {...props} />
     default: return <FileQuestion {...props} />
+
   }
 }
 
