@@ -8,6 +8,12 @@ files:
   - out/**
   # Los íconos por consola se leen en tiempo de ejecución para la barra de tareas.
   - build/icons/*.png
+  # Los arneses de validación y captura son herramientas de desarrollo: se
+  # conectan al dominio del perfil guardado y no tienen nada que hacer dentro
+  # del paquete que se distribuye.
+  - '!out/main/probe*.js'
+  - '!out/main/uitest*.js'
+  - '!out/main/validate.js'
   - '!**/*.map'
   - '!node_modules/**/{test,__tests__,tests,example,examples,doc,docs}/**'
   - '!node_modules/**/*.{md,markdown,ts,map}'
