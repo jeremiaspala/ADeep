@@ -1,9 +1,21 @@
-# ADeep
+# ADeep — RSAT para Linux
 
-**Administración de Active Directory para Linux.** Un RSAT hecho de cero: diez consolas con el
-mismo lenguaje visual, sobre LDAP nativo, sin Windows y sin una máquina virtual en el medio.
+**Administrá Active Directory desde Linux, sin Windows y sin una máquina virtual en el medio.**
 
-![Las consolas de ADeep](docs/img/consolas.png)
+ADeep es una alternativa nativa a las consolas MMC de **RSAT** (Remote Server Administration
+Tools): diez aplicaciones de escritorio que hablan **LDAP** directo contra el controlador de
+dominio. Incluye el equivalente a **ADUC** (Active Directory Users and Computers), Sitios y
+servicios, Dominios y confianzas, **DNS**, DFS, Directivas de grupo, Certificados (AD CS),
+Hyper-V y un editor LDAP tipo ADSI Edit.
+
+Escrito en Electron + React + TypeScript. Se distribuye como **AppImage**: no hace falta unir
+el equipo al dominio, ni configurar Kerberos, ni `sssd`, ni `realmd`.
+
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
+[![Descargar AppImage](https://img.shields.io/github/v/release/jeremiaspala/ADeep?label=descargar)](https://github.com/jeremiaspala/ADeep/releases/latest)
+[![Linux](https://img.shields.io/badge/plataforma-Linux%20x86--64-informational)](https://github.com/jeremiaspala/ADeep/releases/latest)
+
+**[⬇ Descargar la última versión](https://github.com/jeremiaspala/ADeep/releases/latest)**
 
 ---
 
@@ -66,29 +78,53 @@ Para tenerlas en el menú del escritorio, bajá los `.desktop`, los `.png` y
 
 ## Capturas
 
-### Usuarios y equipos
-![Usuarios y equipos](docs/img/aduc.png)
+> Pendientes de rehacer. Las que había mostraban un dominio productivo real y se quitaron del
+> repositorio por eso; las nuevas se van a generar contra un laboratorio.
+> `npm run uitest` las produce automáticamente en `docs/img/`.
 
-### Sitios y servicios
-![Sitios y servicios](docs/img/sites.png)
 
-### DNS
-![DNS](docs/img/dns.png)
+## Equivalencias con RSAT
 
-### Administración de DFS
-![DFS](docs/img/dfs.png)
+Si venís de Windows, cada consola de ADeep reemplaza a un complemento de MMC:
 
-### Directivas de grupo
-![Directivas de grupo](docs/img/gpo.png)
+| MMC / RSAT (Windows) | Consola de ADeep |
+|---|---|
+| `dsa.msc` — Active Directory Users and Computers (ADUC) | Usuarios y equipos |
+| `dssite.msc` — Active Directory Sites and Services | Sitios y servicios |
+| `domain.msc` — Active Directory Domains and Trusts | Dominios y confianzas |
+| `dnsmgmt.msc` — DNS Manager | DNS |
+| `dfsmgmt.msc` — DFS Management | Administración de DFS |
+| `gpmc.msc` — Group Policy Management Console | Directivas de grupo |
+| `certsrv.msc` / `certtmpl.msc` — Certification Authority | Certificados |
+| `virtmgmt.msc` — Hyper-V Manager | Hyper-V *(parcial)* |
+| `dhcpmgmt.msc` — DHCP | DHCP *(parcial)* |
+| `adsiedit.msc` — ADSI Edit | Editor LDAP |
 
-### Certificados
-![Certificados](docs/img/adcs.png)
+## Preguntas frecuentes
 
-### Editor LDAP
-![Editor LDAP](docs/img/ldap.png)
+**¿Se puede administrar Active Directory desde Linux sin RSAT?**
+Sí. ADeep habla LDAP directo contra el DC, que es el mismo protocolo que usan las consolas de
+Windows para casi todo. No necesita Wine, ni una VM con Windows, ni RSAT instalado en ningún
+lado.
 
-### Dominios y confianzas
-![Dominios y confianzas](docs/img/trusts.png)
+**¿Hay que unir la máquina Linux al dominio?**
+No. Alcanza con llegar al DC por LDAPS (636) o StartTLS (389) y tener credenciales del dominio.
+
+**¿Qué distribuciones soporta?**
+Cualquiera con FUSE 3 y entorno gráfico. Probado en Ubuntu, Debian, Fedora y derivadas. El
+AppImage trae un runtime estático, así que no necesita `libfuse2`.
+
+**¿Puede crear usuarios y restablecer contraseñas?**
+Sí. Las escrituras de contraseña exigen canal cifrado, como en Windows: LDAPS o StartTLS.
+
+**¿Qué NO puede hacer?**
+Todo lo que no vive en el directorio: crear relaciones de confianza (LSA RPC), ámbitos de DHCP,
+encender máquinas virtuales de Hyper-V, emitir certificados o editar el contenido de las
+directivas de grupo. Está detallado en [Límites conocidos](#límites-conocidos).
+
+**¿Es seguro usarlo contra producción?**
+Las lecturas están validadas de forma exhaustiva. Las escrituras están menos ejercitadas:
+probalas en un laboratorio primero. Los arneses de verificación que trae son de sólo lectura.
 
 ## Cómo está hecho
 
@@ -196,6 +232,33 @@ Tres consolas traen una vista que sólo lee y no cambia nada:
   consola** y problemas frecuentes.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — el plan por fases y las decisiones de arquitectura.
 - [`docs/BITACORA.md`](docs/BITACORA.md) — el historial de lo que se fue haciendo y por qué.
+
+---
+
+## In English
+
+**ADeep — RSAT for Linux.** Manage Active Directory from Linux, without Windows and without a
+virtual machine in the middle.
+
+ADeep is a native replacement for the Microsoft **RSAT** MMC snap-ins: ten desktop consoles that
+speak **LDAP** directly to the domain controller. It covers **ADUC** (Active Directory Users and
+Computers), Sites and Services, Domains and Trusts, **DNS**, DFS, Group Policy, Certificate
+Services (AD CS), Hyper-V and an ADSI Edit style raw LDAP browser.
+
+Built with Electron, React and TypeScript, shipped as an **AppImage**. The machine does not need
+to be domain-joined, and there is no Kerberos, `sssd` or `realmd` setup involved — just LDAPS or
+StartTLS to a reachable domain controller.
+
+It also ships read-only **security review** views: DNS zones accepting insecure dynamic updates,
+dangling pointer records and stale root hints; unconstrained and resource-based Kerberos
+delegation on Hyper-V hosts; and ESC1/ESC2/ESC3/ESC9 findings on certificate templates.
+
+The user interface and documentation are in Spanish. Download the AppImage from
+[Releases](https://github.com/jeremiaspala/ADeep/releases/latest).
+
+*Keywords: Active Directory management on Linux, RSAT alternative for Linux, ADUC for Linux,
+LDAP admin tool, Active Directory Users and Computers Linux client, manage AD without Windows,
+Group Policy from Linux, DNS manager for Active Directory, Linux domain administration.*
 
 ## Licencia
 

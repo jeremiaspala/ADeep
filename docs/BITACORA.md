@@ -51,8 +51,8 @@ Los tres que encontró la revisión, con respaldo en `~/rollback-dns-2026-09-14.
 | Zona | Nodo | Qué era |
 |---|---|---|
 | `..TrustAnchors` | `@` | NS → `dc-retirado` — un DC que ya no existe. Quedaron los otros 4 NS |
-| `11.10.12.in-addr.arpa` | `197` | PTR → `equipo-viejo-1`. Era su único registro: se borró el nodo |
-| `8.10.12.in-addr.arpa` | `203` | PTR → `equipo-viejo-2`. Ídem |
+| `11.0.10.in-addr.arpa` | `197` | PTR → `equipo-viejo-1`. Era su único registro: se borró el nodo |
+| `8.0.10.in-addr.arpa` | `203` | PTR → `equipo-viejo-2`. Ídem |
 
 Antes de borrar se verificó que los tres nombres no existieran **ni en el directorio ni en
 ninguna zona DNS**. El caso de `dc-retirado` se miró aparte porque un NS no es un PTR: borrar un
