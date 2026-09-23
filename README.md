@@ -1,3 +1,4 @@
+<img width="1449" height="927" alt="adeep" src="https://github.com/user-attachments/assets/adf0e2cd-82cf-4a1e-b820-f1a81c1f7d72" />
 # ADeep — RSAT para Linux
 
 **Administrá Active Directory desde Linux, sin Windows y sin una máquina virtual en el medio.**
