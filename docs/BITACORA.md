@@ -42,6 +42,80 @@ Cada escritura se ejecutó contra el WSUS de prueba y se verificó releyendo. Al
 (aprobaciones, rechazos, grupos y pertenencias) se comparó contra un respaldo tomado antes de
 empezar y quedó idéntico. El de producción quedó en sólo lectura.
 
+Lo que pasó la prueba: alta y baja de grupos y subgrupos, pertenencia de un equipo, aprobar
+para instalar con fecha límite, aprobar para quitar, «no aprobada», rechazar y quitar el
+rechazo, alta y baja de una regla automática, sincronizar y detener, y reescribir sin cambios la
+configuración, la programación, los productos y el correo (comparando campo por campo antes y
+después). Lo que **no** se ejercitó: el asistente de limpieza, que borra de verdad; quitar
+equipos; cancelar o reintentar descargas; aceptar licencias; ejecutar una regla y el correo de
+prueba.
+
+De paso salieron dos cosas que la especificación no dice:
+
+- `GetSubscriptionState` vale 1 inactiva, 2 pedida y 3 en curso. La fase de
+  `GetServerSyncProgress` se queda en 0 si la sincronización dura pocos segundos, así que «en
+  curso» se decide con las dos. Mientras sincroniza, la consola relee el estado cada 5 s y al
+  terminar recarga el catálogo.
+- `ExecuteSPGetUpdateServerStatus` devuelve todo nulo y `TextIncludes` no filtra: el resumen se
+  calcula de los resúmenes por equipo y por actualización, y el catálogo se trae entero (unos
+  3 s para 2000 actualizaciones) y se filtra en la consola.
+
+### Lo que encontraron las capturas
+
+Se recorrió la consola entera con capturas contra el WSUS de producción, en sólo lectura. Las
+pantallas encontraron lo que el typecheck no ve:
+
+- La casilla de selección compartía celda con el ícono de la fila, y el ícono se achicaba con
+  los títulos largos. Ahora tiene columna propia.
+- `label.check` es `inline-flex`: en los formularios de Opciones las casillas se encadenaban en
+  una línea. Van envueltas (`Opt` en `consoles/wsus/common.tsx`).
+- La tabla de reglas automáticas se salía del diálogo.
+- El diálogo de productos no dejaba ver qué estaba marcado entre cientos de productos: se sumó
+  «Sólo los marcados».
+
+`uitest-audit` ahora incluye WSUS, con «sincronizar» en la lista negra: 231 ítems, ninguno sin
+efecto.
+
+### El disco lleno
+
+A mitad de la sesión el disco de la máquina de desarrollo llegó al 100% y una escritura dejó
+`WsusConsole.tsx` en 0 bytes. Se reconstruyó; desde ahí, los fuentes nuevos se respaldaban en
+`/tmp` (tmpfs) antes de cada paso grande. El que llenaba el disco era ajeno a ADeep: un proceso
+que lanza Chrome headless dejó unos 5000 perfiles temporales sin borrar en
+`~/.cache/google-chrome-headless` (25 GB, 4300 sólo esa tarde, unos 25 por minuto). Se
+borraron, junto con revisiones viejas de snap y la caché de apt: de 1,3 a 28 GB libres. Qué
+proceso los crea quedó sin identificar: frenó antes de poder verlo.
+
+### v0.7.0
+
+Publicada con la consola de WSUS. El remoto tenía un commit hecho desde GitHub (la imagen del
+README) y se integró con un rebase. El AppImage que Jeremías tenía instalado era el 0.6.0 y sus
+lanzadores apuntaban a un 0.4.0 que ya no existía: por eso «no aparecía» la consola.
+
+---
+
+## 2026-10-02 (noche) — v0.7.1: lanzadores que funcionan en cualquier equipo
+
+Los `.desktop` de `launchers.zip` llevaban la ruta absoluta del equipo donde se compiló
+(`Exec=/var/www/html/ADeep/release/...`) desde que existen los lanzadores. A cualquiera que
+bajara la release no le andaban, y de paso publicaban esa ruta.
+
+Ahora salen con `Exec="@APPIMAGE@"` y `instalar-lanzadores.sh` completa la ruta real: la toma
+por argumento o busca el AppImage más nuevo junto al script, en la carpeta de arriba (donde
+queda al descomprimir el zip al lado del AppImage), en `~/Applications`, `~/Descargas` y
+`~/Downloads`. Le da permiso de ejecución y rechaza las rutas con comillas, `$` o barras
+invertidas, que en un `Exec` exigen un doble escapado frágil. El reemplazo usa
+`index`/`substr` de awk y no `gsub`, porque `gsub` interpreta el `&` del reemplazo.
+
+Probado como lo usaría alguien que lo baja: `HOME` vacío, sin perfiles, el AppImage sin permiso
+de ejecución en `~/Descargas/Mis cosas & más/`. Los lanzadores pasan `desktop-file-validate`
+y `gio launch` abre la consola. Dentro del asar no hay arneses ni rutas o nombres de la red.
+
+La misma pasada encontró dos ejemplos con barras duplicadas: `CORP\\admin` en la conexión y
+`\\\\servidor\\recurso` en DFS. En un atributo JSX entre comillas, `\\` no es un escape.
+
+La release 0.7.0 quedó con una nota que remite a la 0.7.1.
+
 ---
 
 ## 2026-09-14 (noche) — Un bug propio, los root hints y la basura de siete años
