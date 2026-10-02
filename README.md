@@ -66,12 +66,17 @@ chmod +x ADeep-*-x86_64.AppImage
 Desde cualquier consola, el menú **Consolas** (o el botón de la punta derecha de la barra de
 herramientas) abre las otras.
 
-Para tenerlas en el menú del escritorio, bajá los `.desktop`, los `.png` y
-`instalar-lanzadores.sh` de la misma release al directorio del AppImage y corré el script:
+Para tenerlas en el menú del escritorio, bajá `launchers.zip` de la misma release,
+descomprimilo en la carpeta del AppImage y corré el instalador. Busca el AppImage ahí, en
+`~/Applications`, `~/Descargas` o `~/Downloads`; si lo tenés en otro lado, pasale la ruta:
 
 ```sh
-./instalar-lanzadores.sh
+unzip launchers.zip
+sh launchers/instalar-lanzadores.sh                      # o:
+sh launchers/instalar-lanzadores.sh ~/apps/ADeep-*-x86_64.AppImage
 ```
+
+Si después movés el AppImage, volvé a correrlo.
 
 ### Requisitos
 

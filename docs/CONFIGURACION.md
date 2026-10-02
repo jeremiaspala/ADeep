@@ -139,8 +139,8 @@ una sola sesión LDAP**: te autenticás una vez.
 ```
 
 Desde cualquier consola, el menú **Consolas** abre las otras. Para tenerlas en el menú del
-escritorio, bajá los `.desktop`, los `.png` y `instalar-lanzadores.sh` de la release al mismo
-directorio del AppImage y corré el script.
+escritorio, descomprimí `launchers.zip` de la release en la carpeta del AppImage y corré
+`sh launchers/instalar-lanzadores.sh` (o pasale la ruta del AppImage si está en otro lado).
 
 ### Revisiones de seguridad
 

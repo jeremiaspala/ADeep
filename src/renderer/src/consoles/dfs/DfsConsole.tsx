@@ -611,7 +611,7 @@ function FolderDialog({
             <input
               type="text"
               value={newTarget}
-              placeholder="\\\\servidor\\recurso"
+              placeholder="\\servidor\recurso"
               onChange={(e) => setNewTarget(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') add() }}
             />

@@ -223,7 +223,7 @@ export default function ConnectDialog({
             label="Usuario"
             value={profile.bindDN}
             onChange={(v) => patch({ bindDN: v })}
-            placeholder="admin@corp.local o CORP\\admin"
+            placeholder="admin@corp.local o CORP\admin"
           />
           <Text
             label="Contraseña"
