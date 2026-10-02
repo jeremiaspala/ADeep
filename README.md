@@ -4,10 +4,11 @@
 **Administrá Active Directory desde Linux, sin Windows y sin una máquina virtual en el medio.**
 
 ADeep es una alternativa nativa a las consolas MMC de **RSAT** (Remote Server Administration
-Tools): diez aplicaciones de escritorio que hablan **LDAP** directo contra el controlador de
+Tools): once aplicaciones de escritorio que hablan **LDAP** directo contra el controlador de
 dominio. Incluye el equivalente a **ADUC** (Active Directory Users and Computers), Sitios y
 servicios, Dominios y confianzas, **DNS**, DFS, Directivas de grupo, Certificados (AD CS),
-Hyper-V y un editor LDAP tipo ADSI Edit.
+Hyper-V, un editor LDAP tipo ADSI Edit y la consola de **WSUS**, que habla con el servidor de
+actualizaciones por su propio protocolo.
 
 Escrito en Electron + React + TypeScript. Se distribuye como **AppImage**: no hace falta unir
 el equipo al dominio, ni configurar Kerberos, ni `sssd`, ni `realmd`.
@@ -34,6 +35,7 @@ el equipo al dominio, ni configurar Kerberos, ni `sssd`, ni `realmd`.
 | **Editor LDAP** | Acceso crudo a cualquier contexto de nombres: dominio, configuración, esquema y particiones DNS |
 | **Directivas de grupo** | Directivas, dónde se aplica cada una, precedencia, herencia y estado |
 | **Certificados** | Entidades emisoras, plantillas y revisión de seguridad (ESC1, ESC2, ESC3, ESC9) |
+| **WSUS** | Actualizaciones, aprobaciones por grupo con fecha límite, rechazos, equipos y grupos, sincronización, productos y clasificaciones, reglas automáticas, asistente de limpieza, correo, informes y revisión. Habla MS-WSUSAR con el servidor, no LDAP |
 
 Cada consola abre en su propia ventana, como los complementos de MMC, pero **todas comparten
 proceso y una sola sesión LDAP**: te autenticás una vez.
@@ -58,6 +60,7 @@ chmod +x ADeep-*-x86_64.AppImage
 ./ADeep-*-x86_64.AppImage --console=ldap     # Editor LDAP
 ./ADeep-*-x86_64.AppImage --console=gpo      # Directivas de grupo
 ./ADeep-*-x86_64.AppImage --console=adcs     # Certificados
+./ADeep-*-x86_64.AppImage --console=wsus     # WSUS
 ```
 
 Desde cualquier consola, el menú **Consolas** (o el botón de la punta derecha de la barra de
@@ -100,6 +103,7 @@ Si venís de Windows, cada consola de ADeep reemplaza a un complemento de MMC:
 | `virtmgmt.msc` — Hyper-V Manager | Hyper-V *(parcial)* |
 | `dhcpmgmt.msc` — DHCP | DHCP *(parcial)* |
 | `adsiedit.msc` — ADSI Edit | Editor LDAP |
+| `wsus.msc` — Windows Server Update Services | WSUS |
 
 ## Preguntas frecuentes
 
@@ -139,9 +143,11 @@ dependencia de runtime. Todo el trabajo sucio está resuelto a mano en el proces
 - **`schedule`** — bitmap semanal de 7×24 de vínculos, conexiones y DFS-R.
 - **`gPLink`** — vínculos de directivas de grupo, que se guardan al revés de la precedencia.
 - **`msDS-TrustForestTrustInfo`** — espacios de nombres de una confianza de bosque.
+- **MS-WSUSAR + NTLMv2** — el servicio SOAP con el que la consola de Windows administra WSUS,
+  con la autenticación NTLMv2 (MD4 propio, enlace al canal TLS) escrita a mano, sin dependencias.
 - SIDs, GUIDs, FILETIME, DNs, `userAccountControl`, `groupType` y compañía.
 
-Las diez consolas comparten proceso y **una sola sesión LDAP**. Eso hace que el refresco entre
+Las once consolas comparten proceso y **una sola sesión LDAP**. Eso hace que el refresco entre
 ventanas salga barato: cuando una consola escribe, el puente IPC avisa a las demás y cada una
 recarga su vista. Sin sondeo — si nadie escribe, no hay tráfico. Los cambios hechos fuera de
 ADeep sí necesitan F5.
@@ -175,7 +181,7 @@ perfil guardado. **Son de sólo lectura**, para poder correrlos sin riesgo:
 
 ```sh
 npm run validate     # 56 verificaciones de sólo lectura contra el DC del perfil
-npm run uitest       # abre las diez consolas, conecta y captura pantalla
+npm run uitest       # abre las once consolas, conecta y captura pantalla
 npm run uitest:refresh  # dos consolas: una escribe, la otra recarga sola
 
 npx electron out/main/uitest-audit.js --no-sandbox   # recorre todos los ítems de menú
@@ -212,6 +218,10 @@ Vale más decirlo que descubrirlo en producción:
 - **Crear espacios de nombres DFS** requiere MS-DFSNM por RPC. Se administran los que ya existen.
 - **El contenido de las directivas de grupo** vive en SYSVOL, no en el directorio. Desde acá se
   administra dónde se aplican, en qué orden y con qué estado, no qué configuran.
+- **WSUS no está en el directorio.** La consola se conecta a cada servidor por MS-WSUSAR
+  (HTTP 8530 o HTTPS 8531) con la cuenta de la sesión, y cada servidor arranca en **sólo
+  lectura** hasta que se habiliten los cambios en su conexión. Los idiomas y las contraseñas
+  del proxy y del SMTP se ven pero se cargan desde la consola de Windows.
 - **Emitir o revocar certificados** es MS-ICPR por RPC. Se administran las plantillas, sus
   permisos y qué entidad emisora publica cada una.
 - Los servidores DNS y DFS releen su configuración de AD por sondeo, así que un cambio puede
@@ -219,13 +229,16 @@ Vale más decirlo que descubrirlo en producción:
 
 ## Revisiones de seguridad
 
-Tres consolas traen una vista que sólo lee y no cambia nada:
+Cuatro consolas traen una vista que sólo lee y no cambia nada:
 
 - **DNS** — zonas con actualizaciones dinámicas no seguras, comodines, `wpad`/`isatap`
   publicados, CNAME mal formados y punteros colgados.
 - **Hyper-V** — delegación no restringida, RBCD, transición de protocolo, RC4 habilitado,
   delegación hacia hosts dados de baja y máquinas virtuales abandonadas.
 - **Certificados** — ESC1, ESC2, ESC3 y ESC9 en las plantillas.
+- **WSUS** — servidor sin SSL (inyección de actualizaciones falsas), críticas necesarias sin
+  aprobar, sincronizaciones viejas o fallidas, descargas fallidas, equipos que no informan y
+  reemplazadas sin rechazar.
 
 ## Documentación
 
@@ -241,10 +254,11 @@ Tres consolas traen una vista que sólo lee y no cambia nada:
 **ADeep — RSAT for Linux.** Manage Active Directory from Linux, without Windows and without a
 virtual machine in the middle.
 
-ADeep is a native replacement for the Microsoft **RSAT** MMC snap-ins: ten desktop consoles that
+ADeep is a native replacement for the Microsoft **RSAT** MMC snap-ins: eleven desktop consoles that
 speak **LDAP** directly to the domain controller. It covers **ADUC** (Active Directory Users and
 Computers), Sites and Services, Domains and Trusts, **DNS**, DFS, Group Policy, Certificate
-Services (AD CS), Hyper-V and an ADSI Edit style raw LDAP browser.
+Services (AD CS), Hyper-V, an ADSI Edit style raw LDAP browser and a WSUS console that speaks
+MS-WSUSAR to the update server.
 
 Built with Electron, React and TypeScript, shipped as an **AppImage**. The machine does not need
 to be domain-joined, and there is no Kerberos, `sssd` or `realmd` setup involved — just LDAPS or

@@ -53,7 +53,8 @@ export default defineConfig({
           hyperv: resolve(__dirname, 'src/renderer/hyperv.html'),
           ldap: resolve(__dirname, 'src/renderer/ldap.html'),
           gpo: resolve(__dirname, 'src/renderer/gpo.html'),
-          adcs: resolve(__dirname, 'src/renderer/adcs.html')
+          adcs: resolve(__dirname, 'src/renderer/adcs.html'),
+          wsus: resolve(__dirname, 'src/renderer/wsus.html')
         }
       }
     },

@@ -80,6 +80,9 @@ export type NodeKind =
   | 'dnsRoot' | 'dnsZone' | 'dnsReverseZone' | 'dnsRecord' | 'dhcpRoot' | 'dhcpServer'
   // Hyper-V
   | 'hvRoot' | 'hvHost' | 'hvGuest' | 'hvCluster' | 'hvDelegation' | 'hvCheck'
+  // WSUS
+  | 'wsusServer' | 'wsusUpdates' | 'wsusUpdate' | 'wsusComputers' | 'wsusGroup' | 'wsusComputer'
+  | 'wsusSync' | 'wsusOptions' | 'wsusReports' | 'wsusDownstream' | 'wsusCheck'
   | 'unknown'
 
 export interface DirEntry {
@@ -828,4 +831,277 @@ export interface HyperVState {
   guests: HyperVGuest[]
   clusters: HyperVCluster[]
   issues: HyperVIssue[]
+}
+
+/* ---------------- WSUS ---------------- */
+
+export interface WsusServerConfig {
+  id: string
+  /** Nombre para mostrar; si falta se usa el host. */
+  name: string
+  host: string
+  /** 8530 en HTTP, 8531 en HTTPS. */
+  port: number
+  ssl: boolean
+  insecureTLS?: boolean
+  /** Sin esto el backend rechaza toda operación que cambie algo en el servidor. */
+  allowWrites: boolean
+  /** Usuario propio para este servidor; si falta, las credenciales de la sesión LDAP. */
+  user?: string
+}
+
+/** UpdateInstallationState de MS-WSUSAR 2.2.5.1. */
+export interface WsusStateCounts {
+  unknown: number
+  notApplicable: number
+  notInstalled: number
+  downloaded: number
+  installed: number
+  failed: number
+  pendingReboot: number
+}
+
+export interface WsusOverview {
+  version: string
+  protocolVersion?: string
+  /** 0 sin acceso, 1 informes, 2 administrador. */
+  role: number
+  database: { server?: string; name?: string }
+  computerCount: number
+  updateCount: number
+  subscription: WsusSubscription
+  /** Fase de la sincronización en curso: 0 ninguna, 1 actualizaciones, 2 aprobaciones, 3 categorías. */
+  syncPhase: number
+  /** Hay una sincronización pedida o corriendo. */
+  syncRunning: boolean
+  syncTotal: number
+  syncProcessed: number
+  download: { done: number; total: number }
+  componentsWithErrors: string[]
+  config: WsusConfigSummary
+  allowWrites: boolean
+  /** Cuenta con la que se autentica, DOMINIO\usuario. */
+  adminName: string
+}
+
+export interface WsusSubscription {
+  synchronizeAutomatically: boolean
+  /** Segundos desde la medianoche UTC. */
+  timeOfDay: number
+  perDay: number
+  lastSync?: string
+  nextSync?: string
+  lastModifiedBy?: string
+  lastModified?: string
+  /** GetSubscriptionState, que MS-WSUSAR no documenta: 1 inactiva, 2 pedida, 3 en curso. */
+  state: number
+}
+
+export interface WsusConfigSummary {
+  syncFromMicrosoft: boolean
+  upstreamServer?: string
+  upstreamPort: number
+  upstreamSsl: boolean
+  replica: boolean
+  useProxy: boolean
+  proxyName?: string
+  proxyPort: number
+  /** Los binarios se guardan en el servidor (falso: los clientes bajan de Microsoft Update). */
+  storeLocally: boolean
+  contentPath?: string
+  /** Sólo descargar lo aprobado. */
+  downloadOnlyApproved: boolean
+  expressPackages: boolean
+  /** Asignación a grupos desde la consola (falso: por directiva de grupo). */
+  serverTargeting: boolean
+  computerDeletionDays: number
+  allLanguages: boolean
+  languages: string[]
+  driversDisabled: boolean
+}
+
+export interface WsusGroup {
+  id: string
+  name: string
+  parentId?: string
+  /** Grupos que vienen con WSUS y no se pueden borrar. */
+  builtin: boolean
+  computerCount: number
+}
+
+export interface WsusComputer {
+  id: string
+  name: string
+  ip?: string
+  os?: string
+  osVersion?: string
+  clientVersion?: string
+  make?: string
+  model?: string
+  locale?: string
+  lastSync?: string
+  lastReport?: string
+  /** 0 nunca, 1 bien, 2 falló, 3 cancelada, 4 desconocido. */
+  lastSyncResult: number
+  requestedGroup?: string
+  groupIds: string[]
+  counts: WsusStateCounts
+}
+
+export interface WsusApproval {
+  id: string
+  groupId: string
+  /** 0 instalar, 1 quitar, 2 no aprobada. */
+  action: number
+  deadline?: string
+  time?: string
+  admin?: string
+  revision: number
+}
+
+export interface WsusUpdate {
+  id: string
+  revision: number
+  revisionId: number
+  localId: number
+  title: string
+  description?: string
+  kb: string[]
+  bulletins: string[]
+  urls: string[]
+  classification?: string
+  products: string[]
+  /** Unspecified, Low, Moderate, Important, Critical. */
+  msrc: string
+  created?: string
+  arrival?: string
+  declined: boolean
+  /** Reemplazada por otra actualización. */
+  superseded: boolean
+  /** Reemplaza a otras. */
+  supersedes: boolean
+  latestRevision: boolean
+  /** Microsoft la retiró del catálogo. */
+  expired: boolean
+  requiresEula: boolean
+  /** 0 nunca reinicia, 1 siempre, 2 puede pedirlo. */
+  rebootBehavior: number
+  uninstallable: boolean
+  /** UpdateState 2.2.5.11: 5 lista, 4 faltan archivos, 7 falló la descarga… */
+  state: number
+  approvals: WsusApproval[]
+  counts: WsusStateCounts
+}
+
+export interface WsusUpdateRef {
+  id: string
+  revision: number
+  title: string
+  kb: string[]
+  declined: boolean
+}
+
+export interface WsusUpdateDetail {
+  supersededBy: WsusUpdateRef[]
+  supersedes: WsusUpdateRef[]
+  /** Estado por equipo. */
+  computers: { computerId: string; name?: string; state: number; groupId?: string }[]
+  /** Totales por grupo. */
+  groups: { groupId: string; counts: WsusStateCounts }[]
+}
+
+export interface WsusComputerUpdate {
+  updateId: string
+  title: string
+  kb: string[]
+  classification?: string
+  msrc: string
+  state: number
+}
+
+export interface WsusEvent {
+  time: string
+  namespace: number
+  eventId: number
+  severity: number
+  hresult: number
+  message: string
+  computerId?: string
+  updateId?: string
+}
+
+export interface WsusSyncRun {
+  start: string
+  end?: string
+  manual: boolean
+  /** ok, error, cancelada o en curso. */
+  result: 'ok' | 'error' | 'cancelada' | 'en curso'
+  hresult?: number
+  message?: string
+}
+
+export interface WsusCategory {
+  id: string
+  title: string
+  description?: string
+  /** UpdateClassification, Product, ProductFamily, Company. */
+  type: string
+  parentId?: string
+  arrival?: string
+}
+
+export interface WsusProductsAndClassifications {
+  classifications: WsusCategory[]
+  products: WsusCategory[]
+  selectedClassifications: string[]
+  selectedProducts: string[]
+}
+
+export interface WsusApprovalRule {
+  id: number
+  name: string
+  enabled: boolean
+  action: number
+  deadlineDays?: number
+  deadlineMinutes?: number
+  classificationIds: string[]
+  categoryIds: string[]
+  groupIds: string[]
+}
+
+export interface WsusEmailConfig {
+  sendSyncNotification: boolean
+  sendStatusNotification: boolean
+  statusFrequency: 'Daily' | 'Weekly'
+  /** Segundos desde la medianoche. */
+  statusTimeOfDay: number
+  smtpHost: string
+  smtpPort: number
+  smtpRequiresAuth: boolean
+  smtpUser: string
+  senderName: string
+  senderAddress: string
+  language: string
+  syncRecipients: string
+  statusRecipients: string
+}
+
+export interface WsusCleanupResult {
+  supersededDeclined?: number
+  expiredDeclined?: number
+  obsoleteUpdatesDeleted?: number
+  updatesCompressed?: number
+  computersDeleted?: number
+  bytesFreed?: number
+  errors: string[]
+}
+
+export interface WsusDownstreamServer {
+  id: string
+  name: string
+  version?: string
+  replica: boolean
+  lastRollup?: string
+  lastSync?: string
+  parentId?: string
 }

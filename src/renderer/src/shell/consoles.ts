@@ -11,7 +11,8 @@ export const CONSOLE_LABELS: Record<string, string> = {
   hyperv: 'Hyper-V',
   ldap: 'Editor LDAP',
   gpo: 'Directivas de grupo',
-  adcs: 'Certificados'
+  adcs: 'Certificados',
+  wsus: 'WSUS'
 }
 
 /**

@@ -19,7 +19,7 @@ const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms)
 const DIALOGO_NATIVO = /exportar/i
 
 /** Nunca se hace clic en estos: escriben en el DC o cierran la aplicación. */
-const NUNCA = /elimin|borrar|desconectar|cerrar esta consola|salir|recolecci|topolog[íi]a ahora|forzar|replicar|quitar|confiar/i
+const NUNCA = /elimin|borrar|desconectar|cerrar esta consola|salir|recolecci|topolog[íi]a ahora|forzar|replicar|quitar|confiar|sincronizar/i
 
 interface Hallazgo {
   consola: string
@@ -208,7 +208,8 @@ async function main(): Promise<void> {
     ['hyperv', 'Hyper-V'],
     ['ldap', 'Editor LDAP'],
     ['gpo', 'Directivas de grupo'],
-    ['adcs', 'Certificados']
+    ['adcs', 'Certificados'],
+    ['wsus', 'WSUS']
   ] as [ConsoleId, string][]) {
     await auditarConsola(id, etiqueta)
   }

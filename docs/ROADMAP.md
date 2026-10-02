@@ -2,7 +2,7 @@
 
 > Documento de continuidad. Si retomás la sesión sin contexto previo, **leé esto primero**
 > y seguí por la fase que esté marcada como en curso.
-> Última actualización: 2026-09-14 — v0.6.0 (diez consolas; Hyper-V y DNS terminadas, con revisión de seguridad).
+> Última actualización: 2026-10-02 — once consolas: se sumó WSUS, la primera que no habla LDAP.
 > El historial de lo hecho está en [`BITACORA.md`](BITACORA.md).
 
 **El objetivo declarado es rehacer RSAT para Linux desde cero**: una aplicación por
@@ -363,8 +363,8 @@ aplicación de verdad y le hacen clic a las cosas:
 
 | Comando | Qué hace |
 |---|---|
-| `npm run uitest` | Abre las diez consolas, conecta y captura pantalla de cada una |
-| `npx electron out/main/uitest-audit.js` | Recorre los ítems de menú de las diez consolas y verifica que cada uno haga algo |
+| `npm run uitest` | Abre las once consolas, conecta y captura pantalla de cada una |
+| `npx electron out/main/uitest-audit.js` | Recorre los ítems de menú de las once consolas y verifica que cada uno haga algo |
 | `npx electron out/main/uitest-menu.js` | Regresión puntual: Acción → Nuevo → Usuario abre el diálogo |
 
 La auditoría tiene lista negra de ítems destructivos porque corre contra el dominio
@@ -445,6 +445,68 @@ De Hyper-V, Active Directory guarda el **fabric**, no las máquinas:
 - [x] Propiedades del host con pestaña de seguridad: en quién confía el host, todo junto.
 - [x] Asociar VCO a su CNO por el dueño del descriptor de seguridad — es la única pista fiable,
       no hay atributo que los enlace. **Sin ejercitar: este dominio no tiene ningún clúster.**
+
+### Fase 8 — WSUS  ✅ terminada (escrituras probadas en un WSUS de prueba)
+
+WSUS no vive en el directorio. Es la primera consola con **otro transporte**: **MS-WSUSAR**, el
+servicio SOAP `/ApiRemoting30/WebService.asmx` que usa la propia consola de Windows, por HTTP
+(8530) o HTTPS (8531), con **NTLMv2 escrito a mano** (`src/main/wsus/ntlm.ts`: MD4 propio porque
+OpenSSL 3 lo deshabilita, enlace al canal TLS por si IIS tiene protección extendida). Sin
+dependencias nuevas. Se eligió frente a WinRM + PowerShell (decisión de Jeremías, 2026-10-02):
+no necesita nada prendido en el servidor y cubre todo lo que hace la MMC.
+
+| Archivo | Qué hace |
+|---|---|
+| `wsus/ntlm.ts` | NTLMv2 (negociación, desafío, respuesta), MD4 |
+| `wsus/http.ts` | Cliente HTTP con un solo socket por servidor: NTLM autentica la conexión, no el pedido |
+| `wsus/xml.ts`, `wsus/soap.ts` | Parser mínimo, sobres SOAP, filas `GenericReadableRow` |
+| `wsus/session.ts` | Un cliente por servidor, credenciales de la sesión LDAP o propias, **escrituras bloqueadas por servidor** |
+| `wsus/operations.ts` | Todas las operaciones de la consola |
+
+- [x] Servidores configurados a mano (WSUS no publica SCP) con sugerencia de equipos `wsus*` del dominio.
+      Cada conexión arranca en **sólo lectura**; «Permitir cambios» se habilita por servidor.
+- [x] Resumen: equipos, actualizaciones, sincronización, descargas, base de datos, rol de la cuenta.
+- [x] Actualizaciones con los filtros de la MMC (aprobación, estado, reemplazo, texto), selección
+      múltiple, **aprobar por grupo** (instalar / quitar / no aprobada, con fecha límite), rechazar,
+      quitar el rechazo, cancelar y reintentar descargas, aceptar licencias, propiedades con estado
+      por grupo y por equipo y cadena de reemplazos. Exportación a CSV.
+- [x] Equipos por grupo, pertenencia múltiple, quitar equipos, alta y baja de grupos y subgrupos,
+      propiedades con el estado por actualización y los eventos del cliente.
+- [x] Sincronizaciones: historial (eventos 381–386), sincronizar ahora, detener, seguimiento en vivo.
+- [x] Opciones: origen y proxy, productos y clasificaciones, programación, archivos, asignación de
+      equipos, aprobaciones automáticas (ABM y ejecutar), asistente de limpieza, correo.
+- [x] Informes: estado de actualizaciones, de equipos, por grupo, por clasificación, equipos sin
+      informar y resultados de sincronización, todos con CSV.
+- [x] Revisión: sin SSL, componentes con errores, sincronización vieja o fallida, críticas sin
+      aprobar, descargas fallidas, equipos que no informan, fallan o están sin asignar.
+- [x] **Lecturas** verificadas contra WSUS 2025 (10.0.26100, 165 equipos, 2214 actualizaciones)
+      y WSUS 2019 (10.0.17763). **Escrituras** verificadas sólo en el de prueba, cada una releyendo
+      el resultado y con el estado final comparado contra un respaldo previo: grupos y subgrupos,
+      pertenencia, aprobar / quitar / no aprobada con fecha límite, rechazar y quitar el rechazo,
+      reglas automáticas, sincronizar y detener, y reescritura sin cambios de configuración,
+      programación, productos y correo.
+- [ ] Sin ejercitar: **asistente de limpieza** (borra de verdad), quitar equipos, cancelar o
+      reintentar descargas, aceptar licencias, ejecutar una regla y enviar el correo de prueba.
+- [ ] No se puede: idiomas (el protocolo los maneja por un id que no expone) y contraseñas del
+      proxy y del SMTP (no se leen). Se ven, se cambian desde Windows.
+
+**La especificación miente en tres lugares** (verificado contra los dos servidores):
+
+1. El parámetro de los métodos por equipo es `computerId`, no `ComputerId`. Con la mayúscula
+   el servidor responde «Value cannot be null».
+2. «No aprobada» es la acción **2**, no la 3 de MS-WSUSAR 2.2.5.3. Con 3 el servidor crea un
+   bloqueo en el grupo, o la rechaza si el grupo es «Todos los equipos». Con 2 se quita el rechazo.
+3. Las filas de actualizaciones traen **37 columnas**, no las 33 documentadas: hay una columna
+   extra en el índice 3 y título y descripción en el 29 y el 30. Se leen por índice.
+
+Además, `GetSubscriptionState` no está documentado: 1 inactiva, 2 pedida, 3 en curso. El filtro
+`TextIncludes` del `UpdateScope` no devuelve nada, así que el catálogo se trae entero (unos 3 s
+para 2000 actualizaciones) y se filtra en la consola. `ExecuteSPGetUpdateServerStatus` devuelve
+todo nulo: el resumen se calcula a partir de los resúmenes por equipo y por actualización.
+
+**Para DHCP y Hyper-V:** el NTLMv2 ya existe, pero WinRM por HTTP exige además firma y sellado
+de mensajes (NTLM con claves de sesión), que no está hecho. Por HTTPS (5986) alcanzaría con lo
+que hay. La decisión de transporte para esas dos consolas sigue pendiente.
 
 ### Próximas candidatas
 

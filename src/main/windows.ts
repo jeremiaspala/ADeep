@@ -8,7 +8,7 @@ import { join } from 'node:path'
 import { is } from '@electron-toolkit/utils'
 
 export type ConsoleId =
-  | 'aduc' | 'sites' | 'trusts' | 'dfs' | 'dns' | 'dhcp' | 'hyperv' | 'ldap' | 'gpo' | 'adcs'
+  | 'aduc' | 'sites' | 'trusts' | 'dfs' | 'dns' | 'dhcp' | 'hyperv' | 'ldap' | 'gpo' | 'adcs' | 'wsus'
 
 export interface ConsoleDef {
   id: ConsoleId
@@ -89,6 +89,13 @@ export const CONSOLES: Record<ConsoleId, ConsoleDef> = {
     page: 'adcs.html',
     width: 1400,
     height: 860
+  },
+  wsus: {
+    id: 'wsus',
+    title: 'ADeep — WSUS',
+    page: 'wsus.html',
+    width: 1440,
+    height: 900
   }
 }
 

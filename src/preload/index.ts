@@ -7,7 +7,9 @@ import type {
   DomainControllerInfo, DsaServerInfo, ForestInfo, FsmoRoles, GroupMembership,
   Modification, PartitionInfo, PasswordPolicy, Preferences, SavedQuery, SearchRequest,
   SearchResult, SecurityDescriptor, SessionInfo, SiteInfo, SiteLinkInfo, SubnetInfo,
-  TrustInfo
+  TrustInfo, WsusApprovalRule, WsusCleanupResult, WsusComputer, WsusComputerUpdate,
+  WsusDownstreamServer, WsusEmailConfig, WsusEvent, WsusGroup, WsusOverview,
+  WsusProductsAndClassifications, WsusServerConfig, WsusSyncRun, WsusUpdate, WsusUpdateDetail
 } from '../shared/types'
 
 const call = <T>(channel: string, ...args: unknown[]): Promise<AppResult<T>> =>
@@ -292,6 +294,66 @@ const api = {
     authorities: () => call<CertificateAuthority[]>('adcs.authorities'),
     stores: () => call<{ store: string; label: string; certificates: number; dn: string }[]>('adcs.stores'),
     caCertificates: () => call<{ name: string; store: string; pem: string }[]>('adcs.caCertificates')
+  },
+
+  wsus: {
+    servers: () => call<WsusServerConfig[]>('wsus.servers'),
+    saveServer: (server: WsusServerConfig, password?: string) =>
+      call<WsusServerConfig[]>('wsus.saveServer', server, password),
+    deleteServer: (id: string) => call<WsusServerConfig[]>('wsus.deleteServer', id),
+    ping: (id: string) => call<{ version: string; role: number }>('wsus.ping', id),
+    overview: (id: string) => call<WsusOverview>('wsus.overview', id),
+    groups: (id: string) => call<WsusGroup[]>('wsus.groups', id),
+    computers: (id: string) => call<{ computers: WsusComputer[]; groups: WsusGroup[] }>('wsus.computers', id),
+    computerUpdates: (id: string, computerId: string) =>
+      call<WsusComputerUpdate[]>('wsus.computerUpdates', id, computerId),
+    computerEvents: (id: string, computerId: string, days?: number) =>
+      call<WsusEvent[]>('wsus.computerEvents', id, computerId, days),
+    updates: (id: string) => call<WsusUpdate[]>('wsus.updates', id),
+    updateDetail: (id: string, updateId: string, revision: number) =>
+      call<WsusUpdateDetail>('wsus.updateDetail', id, updateId, revision),
+    syncHistory: (id: string, days?: number) => call<WsusSyncRun[]>('wsus.syncHistory', id, days),
+    products: (id: string) => call<WsusProductsAndClassifications>('wsus.products', id),
+    approvalRules: (id: string) => call<WsusApprovalRule[]>('wsus.approvalRules', id),
+    cleanupPreview: (id: string) =>
+      call<{ obsoleteUpdates: number; updatesToCompress: number; staleComputers: number; computerDays: number }>('wsus.cleanupPreview', id),
+    emailConfig: (id: string) => call<WsusEmailConfig>('wsus.emailConfig', id),
+    downstream: (id: string) => call<WsusDownstreamServer[]>('wsus.downstream', id),
+    createGroup: (id: string, name: string, parentId: string) => call<WsusGroup>('wsus.createGroup', id, name, parentId),
+    deleteGroup: (id: string, groupId: string) => call<boolean>('wsus.deleteGroup', id, groupId),
+    setComputerGroups: (id: string, computerId: string, current: string[], wanted: string[]) =>
+      call<boolean>('wsus.setComputerGroups', id, computerId, current, wanted),
+    deleteComputer: (id: string, computerId: string) => call<boolean>('wsus.deleteComputer', id, computerId),
+    approve: (
+      id: string,
+      items: { id: string; revision: number }[],
+      approvals: { groupId: string; action: number; deadline?: string }[]
+    ) => call<{ id: string; error?: string }[]>('wsus.approve', id, items, approvals),
+    decline: (id: string, ids: string[]) => call<{ id: string; error?: string }[]>('wsus.decline', id, ids),
+    acceptEula: (id: string, updateId: string, revision: number) => call<boolean>('wsus.acceptEula', id, updateId, revision),
+    setDownload: (id: string, items: { id: string; revision: number }[], resume: boolean) =>
+      call<boolean>('wsus.setDownload', id, items, resume),
+    setAllDownloads: (id: string, resume: boolean) => call<boolean>('wsus.setAllDownloads', id, resume),
+    startSync: (id: string) => call<boolean>('wsus.startSync', id),
+    stopSync: (id: string) => call<boolean>('wsus.stopSync', id),
+    setProducts: (id: string, productIds: string[], classificationIds: string[]) =>
+      call<boolean>('wsus.setProducts', id, productIds, classificationIds),
+    setSchedule: (id: string, s: { synchronizeAutomatically: boolean; timeOfDay: number; perDay: number }) =>
+      call<boolean>('wsus.setSchedule', id, s),
+    setConfiguration: (id: string, patch: {
+      syncFromMicrosoft?: boolean; upstreamServer?: string; upstreamPort?: number; upstreamSsl?: boolean
+      replica?: boolean; useProxy?: boolean; proxyName?: string; proxyPort?: number; storeLocally?: boolean
+      downloadOnlyApproved?: boolean; expressPackages?: boolean; serverTargeting?: boolean; computerDeletionDays?: number
+    }) => call<boolean>('wsus.setConfiguration', id, patch),
+    saveApprovalRule: (id: string, rule: WsusApprovalRule) => call<WsusApprovalRule>('wsus.saveApprovalRule', id, rule),
+    deleteApprovalRule: (id: string, ruleId: number) => call<boolean>('wsus.deleteApprovalRule', id, ruleId),
+    runApprovalRule: (id: string, ruleId: number) => call<number>('wsus.runApprovalRule', id, ruleId),
+    cleanup: (id: string, o: {
+      declineSuperseded: boolean; declineExpired: boolean; deleteObsoleteUpdates: boolean
+      compressUpdates: boolean; deleteObsoleteComputers: boolean; deleteUnneededFiles: boolean
+    }) => call<WsusCleanupResult>('wsus.cleanup', id, o),
+    setEmailConfig: (id: string, e: WsusEmailConfig) => call<boolean>('wsus.setEmailConfig', id, e),
+    sendTestEmail: (id: string, e: WsusEmailConfig) => call<boolean>('wsus.sendTestEmail', id, e)
   },
 
   theme: {

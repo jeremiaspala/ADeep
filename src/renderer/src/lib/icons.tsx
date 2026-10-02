@@ -4,7 +4,8 @@ import {
   Monitor, Contact, Printer, HardDrive, Bot, ShieldQuestion, Trash2, FileQuestion,
   Network, Globe, Link2, Server, Cpu, Cable, Handshake, TreePine, Share2,
   FolderSymlink, HardDriveDownload, RefreshCcw, GitBranch, Waypoints,
-  Layers, ServerCog, MonitorPlay, KeyRound, ShieldAlert
+  Layers, ServerCog, MonitorPlay, KeyRound, ShieldAlert, CloudDownload, Package, Settings,
+  BarChart3, RefreshCw
 } from 'lucide-react'
 import type { NodeKind } from '@shared/types'
 
@@ -60,6 +61,17 @@ export const KIND_LABEL: Record<NodeKind, string> = {
   hvCluster: 'Clúster de conmutación por error',
   hvDelegation: 'Delegación de migración en vivo',
   hvCheck: 'Revisión del fabric',
+  wsusServer: 'Servidor WSUS',
+  wsusUpdates: 'Actualizaciones',
+  wsusUpdate: 'Actualización',
+  wsusComputers: 'Equipos',
+  wsusGroup: 'Grupo de equipos',
+  wsusComputer: 'Equipo',
+  wsusSync: 'Sincronizaciones',
+  wsusOptions: 'Opciones',
+  wsusReports: 'Informes',
+  wsusDownstream: 'Servidores secundarios',
+  wsusCheck: 'Revisión',
   unknown: 'Objeto'
 }
 
@@ -115,6 +127,17 @@ const COLORS: Record<NodeKind, string> = {
   hvCluster: '#b57ce0',
   hvDelegation: '#e0a53f',
   hvCheck: '#8b95a3',
+  wsusServer: '#16a34a',
+  wsusUpdates: '#16a34a',
+  wsusUpdate: '#4f8cff',
+  wsusComputers: '#5cc2a0',
+  wsusGroup: '#e0a53f',
+  wsusComputer: '#5cc2a0',
+  wsusSync: '#0891b2',
+  wsusOptions: '#8b95a3',
+  wsusReports: '#b57ce0',
+  wsusDownstream: '#4f8cff',
+  wsusCheck: '#8b95a3',
   unknown: '#8b95a3'
 }
 
@@ -180,6 +203,17 @@ export function KindIcon({
     case 'hvCluster': return <Boxes {...props} />
     case 'hvDelegation': return <KeyRound {...props} />
     case 'hvCheck': return <ShieldAlert {...props} />
+    case 'wsusServer': return <CloudDownload {...props} />
+    case 'wsusUpdates':
+    case 'wsusUpdate': return <Package {...props} />
+    case 'wsusComputers': return <Monitor {...props} />
+    case 'wsusGroup': return <FolderTree {...props} />
+    case 'wsusComputer': return <Monitor {...props} />
+    case 'wsusSync': return <RefreshCw {...props} />
+    case 'wsusOptions': return <Settings {...props} />
+    case 'wsusReports': return <BarChart3 {...props} />
+    case 'wsusDownstream': return <Server {...props} />
+    case 'wsusCheck': return <ShieldAlert {...props} />
     default: return <FileQuestion {...props} />
 
   }

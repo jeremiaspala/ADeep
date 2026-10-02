@@ -11,6 +11,7 @@ import {
 import * as ops from './ldap/operations'
 import * as store from './store'
 import { registerConsoleIpc } from './ipc-consoles'
+import { clearDomainCredentials, setDomainCredentials } from './wsus/session'
 import { broadcast, broadcastExcept } from './windows'
 import { SDFlagsControl } from './ldap/controls'
 import { buildSecurityDescriptor, parseSecurityDescriptor, SD_FLAGS } from './ldap/sddl'
@@ -83,6 +84,7 @@ export function registerIpc(): void {
     // Todas las consolas abiertas comparten la conexión: hay que avisarles.
     if (conn) { await conn.disconnect(); conn = null }
     conn = await AdConnection.connect({ ...profile }, password)
+    setDomainCredentials(profile.bindDN, password, conn.netbiosName)
     await store.touchProfile(profile.id).catch(() => undefined)
     const info = sessionInfo()
     broadcast('session.changed', info)
@@ -92,6 +94,7 @@ export function registerIpc(): void {
   handle('session.disconnect', async () => {
     if (conn) await conn.disconnect()
     conn = null
+    clearDomainCredentials()
     const info = sessionInfo()
     broadcast('session.changed', info)
     return info

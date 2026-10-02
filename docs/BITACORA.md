@@ -5,6 +5,45 @@ Registro de lo que se hizo, en qué orden y por qué. El plan a futuro está en
 
 ---
 
+## 2026-10-02 — Consola de WSUS: la primera que no habla LDAP
+
+WSUS no deja nada en el directorio. Lo único que hay son los grupos «Administradores WSUS» e
+«Informadores WSUS», las GPO que apuntan los equipos y, por el nombre, los propios servidores.
+Todo lo demás (equipos, grupos de destino, actualizaciones, aprobaciones) vive en SUSDB.
+
+### El transporte
+
+Jeremías eligió **MS-WSUSAR** sobre WinRM: es lo que usa la MMC, no pide nada prendido en el
+servidor y cubre la consola entera. Hizo falta escribir NTLMv2 a mano: el 401 ofrece
+`Negotiate` y `NTLM`, la máquina no está unida al dominio y no hay Kerberos. Dos detalles:
+
+- **MD4.** OpenSSL 3 lo trae deshabilitado y el Node del sistema tira `unsupported`. BoringSSL
+  (Electron) lo tiene, pero los arneses no siempre corren ahí, así que va una implementación
+  propia de 40 líneas verificada contra los vectores del RFC 1320.
+- **NTLM autentica la conexión, no el pedido.** El desafío y la respuesta tienen que viajar por
+  el mismo socket: cada servidor tiene un agente HTTP de un solo socket y los pedidos se
+  serializan.
+
+El plan era HTTPS por 8531. **Los dos servidores aceptan la conexión TCP en 8531 y la cortan
+en el handshake**: el sitio tiene el enlace pero nunca se configuró el certificado. Se quedó en
+8530, igual que la MMC por defecto, con el aviso en la conexión y en la revisión.
+
+### El WSDL no está, la especificación miente
+
+`?WSDL` devuelve 500: WSUS lo deshabilita. Se bajó MS-WSUSAR (el PDF viene protegido; el
+`.docx` no) y se contrastó cada operación contra un servidor real. Tres diferencias con la
+especificación, documentadas en el roadmap: el parámetro `computerId` en minúscula, «no
+aprobada» con la acción 2 y no la 3, y las filas de actualizaciones con 37 columnas en vez de 33.
+La segunda se encontró en el banco de pruebas: «quitar el rechazo» no hacía nada.
+
+### Escrituras, sólo en el WSUS de prueba
+
+Cada escritura se ejecutó contra el WSUS de prueba y se verificó releyendo. Al final, el estado
+(aprobaciones, rechazos, grupos y pertenencias) se comparó contra un respaldo tomado antes de
+empezar y quedó idéntico. El de producción quedó en sólo lectura.
+
+---
+
 ## 2026-09-14 (noche) — Un bug propio, los root hints y la basura de siete años
 
 ### El bug: `dataLength` no era decorativo

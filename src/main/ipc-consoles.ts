@@ -13,7 +13,10 @@ import * as hyperv from './hyperv/operations'
 import * as browser from './ldapbrowser/operations'
 import * as gpo from './gpo/operations'
 import * as adcs from './adcs/operations'
-import type { DfsTarget } from '../shared/types'
+import * as wsus from './wsus/operations'
+import { closeAll as closeWsusClients } from './wsus/session'
+import * as store from './store'
+import type { DfsTarget, WsusApprovalRule, WsusEmailConfig, WsusServerConfig } from '../shared/types'
 
 export type HandleFn = <A extends unknown[], R>(
   channel: string,
@@ -253,4 +256,75 @@ export function registerConsoleIpc(handle: HandleFn, requireConn: () => AdConnec
   handle('adcs.authorities', async () => adcs.listAuthorities(requireConn()))
   handle('adcs.stores', async () => adcs.listTrustStores(requireConn()))
   handle('adcs.caCertificates', async () => adcs.getCaCertificates(requireConn()))
+
+  /* ---------------- WSUS ---------------- */
+
+  handle('wsus.servers', () => store.getWsusServers())
+  handle('wsus.saveServer', async (server: WsusServerConfig, password?: string) => {
+    const list = await store.saveWsusServer(server, password)
+    closeWsusClients()
+    return list
+  })
+  handle('wsus.deleteServer', async (id: string) => {
+    const list = await store.deleteWsusServer(id)
+    closeWsusClients()
+    return list
+  })
+  handle('wsus.ping', (id: string) => wsus.ping(id))
+  handle('wsus.overview', (id: string) => wsus.overview(id))
+  handle('wsus.groups', (id: string) => wsus.groups(id))
+  handle('wsus.computers', (id: string) => wsus.computers(id))
+  handle('wsus.computerUpdates', (id: string, computerId: string) => wsus.computerUpdates(id, computerId))
+  handle('wsus.computerEvents', (id: string, computerId: string, days?: number) => wsus.computerEvents(id, computerId, days))
+  handle('wsus.updates', (id: string) => wsus.updates(id))
+  handle('wsus.updateDetail', (id: string, updateId: string, revision: number) => wsus.updateDetail(id, updateId, revision))
+  handle('wsus.syncHistory', (id: string, days?: number) => wsus.syncHistory(id, days))
+  handle('wsus.products', (id: string) => wsus.productsAndClassifications(id))
+  handle('wsus.approvalRules', (id: string) => wsus.approvalRules(id))
+  handle('wsus.cleanupPreview', (id: string) => wsus.cleanupPreview(id))
+  handle('wsus.emailConfig', (id: string) => wsus.emailConfig(id))
+  handle('wsus.downstream', (id: string) => wsus.downstreamServers(id))
+
+  handle('wsus.createGroup', (id: string, name: string, parentId: string) => wsus.createGroup(id, name, parentId))
+  handle('wsus.deleteGroup', async (id: string, groupId: string) => { await wsus.deleteGroup(id, groupId); return true })
+  handle('wsus.setComputerGroups', async (id: string, computerId: string, current: string[], wanted: string[]) => {
+    await wsus.setComputerGroups(id, computerId, current, wanted)
+    return true
+  })
+  handle('wsus.deleteComputer', async (id: string, computerId: string) => { await wsus.deleteComputer(id, computerId); return true })
+  handle('wsus.approve', (
+    id: string,
+    items: { id: string; revision: number }[],
+    approvals: { groupId: string; action: number; deadline?: string }[]
+  ) => wsus.approve(id, items, approvals))
+  handle('wsus.decline', (id: string, ids: string[]) => wsus.decline(id, ids))
+  handle('wsus.acceptEula', async (id: string, updateId: string, revision: number) => {
+    await wsus.acceptEula(id, updateId, revision)
+    return true
+  })
+  handle('wsus.setDownload', async (id: string, items: { id: string; revision: number }[], resume: boolean) => {
+    await wsus.setDownload(id, items, resume)
+    return true
+  })
+  handle('wsus.setAllDownloads', async (id: string, resume: boolean) => { await wsus.setAllDownloads(id, resume); return true })
+  handle('wsus.startSync', async (id: string) => { await wsus.startSync(id); return true })
+  handle('wsus.stopSync', async (id: string) => { await wsus.stopSync(id); return true })
+  handle('wsus.setProducts', async (id: string, productIds: string[], classificationIds: string[]) => {
+    await wsus.setProductsAndClassifications(id, productIds, classificationIds)
+    return true
+  })
+  handle('wsus.setSchedule', async (id: string, s: { synchronizeAutomatically: boolean; timeOfDay: number; perDay: number }) => {
+    await wsus.setSchedule(id, s)
+    return true
+  })
+  handle('wsus.setConfiguration', async (id: string, patch: wsus.WsusConfigPatch) => {
+    await wsus.setConfiguration(id, patch)
+    return true
+  })
+  handle('wsus.saveApprovalRule', (id: string, rule: WsusApprovalRule) => wsus.saveApprovalRule(id, rule))
+  handle('wsus.deleteApprovalRule', async (id: string, ruleId: number) => { await wsus.deleteApprovalRule(id, ruleId); return true })
+  handle('wsus.runApprovalRule', (id: string, ruleId: number) => wsus.runApprovalRule(id, ruleId))
+  handle('wsus.cleanup', (id: string, o: wsus.CleanupOptions) => wsus.cleanup(id, o))
+  handle('wsus.setEmailConfig', async (id: string, e: WsusEmailConfig) => { await wsus.setEmailConfig(id, e); return true })
+  handle('wsus.sendTestEmail', async (id: string, e: WsusEmailConfig) => { await wsus.sendTestEmail(id, e); return true })
 }

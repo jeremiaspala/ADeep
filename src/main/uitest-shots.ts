@@ -70,7 +70,8 @@ async function main(): Promise<void> {
     ['hyperv', 'hyperv', ['Hosts']],
     ['ldap', 'ldap', ['Configuración']],
     ['gpo', 'gpo', ['Dónde se aplican', 'Users']],
-    ['adcs', 'adcs', ['Plantillas']]
+    ['adcs', 'adcs', ['Plantillas']],
+    ['wsus', 'wsus', ['Actualizaciones']]
   ]
 
   for (const [id, nombre, navegacion] of pasos) {

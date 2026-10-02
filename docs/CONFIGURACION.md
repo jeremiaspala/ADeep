@@ -92,6 +92,7 @@ directorio dice que no, la operación falla y se muestra el error del DC.
 | **Editor LDAP** | Usuario del dominio | Lo que pida cada objeto |
 | **Directivas de grupo** | Usuario del dominio | Vincular: control sobre la OU o el sitio. Crear GPO: *Group Policy Creator Owners* |
 | **Certificados** | Usuario del dominio | Plantillas y entidades emisoras viven en la partición de configuración → *Enterprise Admins* |
+| **WSUS** | *Informadores WSUS* o administrador local del servidor WSUS | *Administradores WSUS* o administrador local del servidor WSUS, y además **«Permitir cambios»** en la conexión de ADeep |
 
 ### Cuenta recomendada
 
@@ -109,7 +110,8 @@ delegación de Kerberos, particiones de configuración) y usala sólo para eso.
 
 ### Lo que ADeep nunca hace
 
-- No guarda ni transmite credenciales a ningún lado que no sea el DC que configuraste.
+- No guarda ni transmite credenciales a ningún lado que no sea el DC y los servidores WSUS que
+  configuraste. A WSUS la contraseña no viaja: NTLMv2 manda una prueba derivada de ella.
 - No hace cambios sin que los pidas: cada escritura sale de una acción explícita de la UI, y las
   destructivas piden confirmación.
 - Los arneses que corren contra un dominio (`npm run validate`, `uitest-audit`) son de **sólo
@@ -133,6 +135,7 @@ una sola sesión LDAP**: te autenticás una vez.
 ./ADeep-*-x86_64.AppImage --console=ldap      # Editor LDAP
 ./ADeep-*-x86_64.AppImage --console=gpo       # Directivas de grupo
 ./ADeep-*-x86_64.AppImage --console=adcs      # Certificados
+./ADeep-*-x86_64.AppImage --console=wsus      # WSUS
 ```
 
 Desde cualquier consola, el menú **Consolas** abre las otras. Para tenerlas en el menú del
@@ -141,7 +144,7 @@ directorio del AppImage y corré el script.
 
 ### Revisiones de seguridad
 
-Tres consolas traen una vista de revisión que sólo lee y no cambia nada:
+Cuatro consolas traen una vista de revisión que sólo lee y no cambia nada:
 
 - **DNS → Revisión de seguridad**: zonas con actualizaciones dinámicas no seguras, registros
   comodín, `wpad`/`isatap` publicados, CNAME mal formados, punteros colgados (PTR, CNAME, NS, MX
@@ -150,6 +153,27 @@ Tres consolas traen una vista de revisión que sólo lee y no cambia nada:
 - **Hyper-V → Revisión**: delegación no restringida, RBCD, transición de protocolo, RC4
   habilitado, delegación hacia hosts dados de baja y VM abandonadas.
 - **Certificados → Revisión de seguridad**: ESC1, ESC2, ESC3 y ESC9 en las plantillas.
+- **WSUS → Revisión**: servidor sin SSL, componentes con errores, sincronización vieja o fallida,
+  actualizaciones de gravedad crítica necesarias y sin aprobar, descargas fallidas, equipos que no
+  informan, que fallan al instalar o que están sin asignar, y reemplazadas sin rechazar.
+
+### WSUS
+
+WSUS no publica nada en el directorio: los servidores se agregan a mano con **Acción → Agregar
+servidor WSUS** (sugiere los equipos del dominio que se llaman `wsus*`). La consola habla
+**MS-WSUSAR**, el servicio SOAP de `/ApiRemoting30/WebService.asmx` que usa la consola de
+Windows, autenticando con **NTLMv2** con la misma cuenta de la sesión LDAP, o con otra por
+servidor.
+
+| | |
+|---|---|
+| Puertos | **8530** (HTTP) u **8531** (HTTPS). El 8531 sólo responde si se configuró SSL con `wsusutil configuressl`; si no, el puerto acepta la conexión y la corta |
+| Permisos | Ver arriba. Sin ningún rol, el servidor responde «rol 0» y la consola lo dice |
+| Escrituras | Cada conexión arranca en **sólo lectura**. «Permitir cambios» en las propiedades de la conexión habilita aprobar, rechazar, mover equipos, sincronizar, limpiar y cambiar opciones |
+| Versiones | Probado contra WSUS de Windows Server 2019 (10.0.17763) y 2025 (10.0.26100) |
+
+Lo que se ve pero no se cambia desde acá: los idiomas, la contraseña del proxy y la del SMTP. El
+protocolo no permite leerlas y conviene cargarlas desde la consola de Windows.
 
 Un hallazgo que es a propósito se marca con **«Es a propósito»**: se sigue evaluando en cada
 pasada, pero pasa a una sección aparte para que lo pendiente quede a la vista. La lista se guarda
@@ -177,6 +201,7 @@ por lo tanto no se pueden hacer por LDAP:
 | Emitir o revocar certificados | MS-ICPR (RPC) | Consola de la CA |
 | Contenido de las directivas de grupo | SYSVOL, no el directorio | GPMC |
 | Replicar un NC completo («Replicar ahora») | DRSUAPI (RPC) | `repadmin` |
+| Idiomas de WSUS y contraseñas del proxy y del SMTP | El protocolo no las expone para lectura | Consola de WSUS de Windows |
 
 DFS v1 (espacios de nombres en modo Windows 2000) es **sólo lectura**: los vínculos viven dentro
 de un blob binario y reescribirlo a ciegas es demasiado riesgo.

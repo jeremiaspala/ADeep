@@ -2,7 +2,7 @@
 import { app, safeStorage } from 'electron'
 import { promises as fs, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { ConnectionProfile, Preferences, SavedQuery } from '../shared/types'
+import type { ConnectionProfile, Preferences, SavedQuery, WsusServerConfig } from '../shared/types'
 
 export type { Preferences }
 
@@ -10,6 +10,7 @@ interface StoreShape {
   profiles: ConnectionProfile[]
   queries: SavedQuery[]
   prefs: Preferences
+  wsusServers: WsusServerConfig[]
 }
 
 const DEFAULT_PREFS: Preferences = {
@@ -63,6 +64,7 @@ export async function load(): Promise<StoreShape> {
   cache = {
     profiles: data.profiles ?? [],
     queries: data.queries ?? [],
+    wsusServers: data.wsusServers ?? [],
     prefs: { ...DEFAULT_PREFS, ...(data.prefs ?? {}) }
   }
   return cache
@@ -194,4 +196,30 @@ export async function setPrefs(prefs: Partial<Preferences>): Promise<Preferences
   s.prefs = { ...s.prefs, ...prefs }
   await persist()
   return s.prefs
+}
+
+/* ---------- Servidores WSUS ---------- */
+
+export async function getWsusServers(): Promise<WsusServerConfig[]> {
+  return (await load()).wsusServers
+}
+
+export async function saveWsusServer(server: WsusServerConfig, password?: string): Promise<WsusServerConfig[]> {
+  const s = await load()
+  const i = s.wsusServers.findIndex((x) => x.id === server.id)
+  if (i >= 0) s.wsusServers[i] = server
+  else s.wsusServers.push(server)
+  // Sin usuario propio se usan las credenciales de la sesión LDAP.
+  if (!server.user) await deleteSecret(`wsus:${server.id}`)
+  else if (password) await setSecret(`wsus:${server.id}`, password)
+  await persist()
+  return s.wsusServers
+}
+
+export async function deleteWsusServer(id: string): Promise<WsusServerConfig[]> {
+  const s = await load()
+  s.wsusServers = s.wsusServers.filter((x) => x.id !== id)
+  await deleteSecret(`wsus:${id}`)
+  await persist()
+  return s.wsusServers
 }
