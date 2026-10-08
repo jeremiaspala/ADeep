@@ -7,15 +7,18 @@ import { KindIcon } from '../lib/icons'
 import { splitDN, rdnValue } from '../lib/format'
 import { select } from '../lib/treeActions'
 import { Spinner } from './ui'
+import { dropHandlers, endDrag, startDrag } from '../lib/dnd'
 
 export default function ListPane({
   onContextMenu,
   onOpen,
-  onHeaderContextMenu
+  onHeaderContextMenu,
+  onDropMove
 }: {
   onContextMenu: (entry: DirEntry | null, x: number, y: number) => void
   onOpen: (entry: DirEntry) => void
   onHeaderContextMenu: (x: number, y: number) => void
+  onDropMove: (dns: string[], target: DirEntry) => void
 }): JSX.Element {
   const view = useApp((s) => s.view)
   const items = useApp((s) => s.items)
@@ -30,6 +33,7 @@ export default function ListPane({
   const set = useApp((s) => s.set)
 
   const [widths, setWidths] = useState<Record<string, number>>({})
+  const [dropDN, setDropDN] = useState<string | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
 
   const cols = useMemo(
@@ -177,11 +181,24 @@ export default function ListPane({
                 key={e.dn}
                 className={`${selSet.has(e.dn.toLowerCase()) ? 'sel' : ''} ${
                   cutSet.has(e.dn.toLowerCase()) ? 'cut' : ''
-                }`}
+                } ${dropDN === e.dn ? 'drop' : ''}`}
+                draggable
                 onMouseDown={(ev) => {
-                  if (ev.button === 2 && selSet.has(e.dn.toLowerCase())) return
+                  // Sobre una fila ya seleccionada se espera al click: puede ser el inicio de un arrastre múltiple.
+                  if (selSet.has(e.dn.toLowerCase()) && !ev.shiftKey && !ev.ctrlKey && !ev.metaKey) return
                   clickRow(ev, e)
                 }}
+                onClick={(ev) => {
+                  if (ev.shiftKey || ev.ctrlKey || ev.metaKey || selection.length < 2) return
+                  if (selSet.has(e.dn.toLowerCase())) set({ selection: [e.dn], lastClickedDN: e.dn })
+                }}
+                onDragStart={(ev) => {
+                  const dns = selSet.has(e.dn.toLowerCase()) ? selection : [e.dn]
+                  if (!selSet.has(e.dn.toLowerCase())) set({ selection: [e.dn], lastClickedDN: e.dn })
+                  startDrag(ev, dns)
+                }}
+                onDragEnd={() => { endDrag(); setDropDN(null) }}
+                {...dropHandlers(e, setDropDN, onDropMove)}
                 onDoubleClick={() => onOpen(e)}
                 onContextMenu={(ev) => {
                   ev.preventDefault()

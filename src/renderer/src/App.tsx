@@ -26,7 +26,7 @@ import {
   copyText, deleteObjects, exportSelectionCsv, exportSelectionLdif, moveObjects,
   renameObject, selectedEntries, setEnabled, unlock
 } from './lib/objectActions'
-import { dnToDomain } from './lib/format'
+import { dnToCanonical, dnToDomain, parentDN, rdnValue } from './lib/format'
 import { consolesMenu } from './shell/consoles'
 
 type Dialog =
@@ -168,6 +168,29 @@ export default function App(): JSX.Element {
     }
     setDialog({ t: 'new', kind: 'user', parentDN: targetDN, copyFrom: clipboard.dns[0] })
   }, [clipboard, targetDN, set])
+
+  const dropMove = useCallback(async (dns: string[], target: DirEntry) => {
+    const t = target.dn.toLowerCase()
+    const moving = dns.filter((d) => parentDN(d).toLowerCase() !== t)
+    if (!moving.length) return
+    const ok = await confirm({
+      title: moving.length === 1 ? 'Mover objeto' : `Mover ${moving.length} objetos`,
+      message: moving.length === 1
+        ? `¿Mover «${rdnValue(moving[0])}» a «${target.name}»?`
+        : `¿Mover ${moving.length} objetos a «${target.name}»?`,
+      detail: `Destino: ${dnToCanonical(target.dn)}. Mover objetos cambia las GPO y la delegación que se les aplican.`,
+      confirmLabel: 'Mover'
+    })
+    if (!ok) return
+    if (await moveObjects(moving, target.dn)) {
+      const moved = new Set(moving.map((d) => d.toLowerCase()))
+      const { clipboard: cb, selection: cur } = useApp.getState()
+      set({
+        selection: cur.filter((d) => !moved.has(d.toLowerCase())),
+        ...(cb?.dns.some((d) => moved.has(d.toLowerCase())) ? { clipboard: null } : {})
+      })
+    }
+  }, [confirm, set])
 
   const goUp = useCallback(async () => {
     if (!selectedDN) return
@@ -505,11 +528,12 @@ export default function App(): JSX.Element {
       </div>
 
       <div className="body">
-        <TreePane onContextMenu={treeContext} />
+        <TreePane onContextMenu={treeContext} onDropMove={(dns, t) => void dropMove(dns, t)} />
         <div className="splitter" onMouseDown={startDrag} />
         <ListPane
           onContextMenu={listContext}
           onOpen={openEntry}
+          onDropMove={(dns, t) => void dropMove(dns, t)}
           onHeaderContextMenu={(x, y) =>
             setCtx({
               items: [

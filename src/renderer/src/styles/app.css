@@ -201,6 +201,23 @@
 .tree-row.sel .tree-label {
   font-weight: 600;
 }
+.tree-row.drop,
+table.list tbody tr.drop {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.drag-ghost {
+  position: fixed;
+  top: -1000px;
+  left: 0;
+  padding: 4px 10px;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .tree-row .twisty {
   display: inline-flex;
   align-items: center;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type JSX } from 'react'
+import { useEffect, useRef, useState, type JSX } from 'react'
 import { ChevronRight, Network } from 'lucide-react'
 import type { DirEntry } from '@shared/types'
 import { useApp } from '../store'
@@ -6,16 +6,26 @@ import { flatten } from '../lib/tree'
 import { collapseNode, expandNode, select, toggleNode, visibleNodes } from '../lib/treeActions'
 import { KindIcon } from '../lib/icons'
 import { Spinner } from './ui'
+import { dropHandlers, endDrag, startDrag } from '../lib/dnd'
 
 export default function TreePane({
-  onContextMenu
+  onContextMenu,
+  onDropMove
 }: {
   onContextMenu: (entry: DirEntry, x: number, y: number) => void
+  onDropMove: (dns: string[], target: DirEntry) => void
 }): JSX.Element {
   const tree = useApp((s) => s.tree)
   const loading = useApp((s) => s.treeLoading)
   const selectedDN = useApp((s) => s.selectedDN)
   const ref = useRef<HTMLDivElement>(null)
+  const [dropDN, setDropDN] = useState<string | null>(null)
+  const expandTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  const setOver = (dn: string | null): void => {
+    clearTimeout(expandTimer.current)
+    setDropDN(dn)
+  }
 
   const rows = flatten(tree)
 
@@ -63,8 +73,15 @@ export default function TreePane({
             <div
               key={node.entry.dn}
               data-sel={sel ? '1' : undefined}
-              className={`tree-row ${sel ? 'sel' : ''}`}
+              className={`tree-row ${sel ? 'sel' : ''} ${dropDN === node.entry.dn ? 'drop' : ''}`}
               style={{ paddingLeft: 6 + depth * 15 }}
+              draggable={node.entry.kind !== 'domain'}
+              onDragStart={(e) => startDrag(e, [node.entry.dn])}
+              onDragEnd={() => { endDrag(); setOver(null) }}
+              {...dropHandlers(node.entry, setOver, onDropMove, () => {
+                if (node.expanded) return
+                expandTimer.current = setTimeout(() => void expandNode(node.entry.dn), 700)
+              })}
               onClick={() => select(node.entry.dn)}
               onDoubleClick={() => void toggleNode(node.entry.dn)}
               onContextMenu={(e) => {
