@@ -22,8 +22,8 @@ seleccionada deja la selección como está, y recién al soltar sin arrastrar qu
 fila. Antes la selección se reducía apenas se apretaba el botón y el arrastre se llevaba un
 solo objeto.
 
-**No se probó contra el DC:** un arrastre mueve objetos de verdad. Compila, pasa `typecheck`
-y el AppImage arranca, pero el arrastre en sí no se ejecutó.
+Probado por Jeremías contra el dominio real desde el AppImage publicado: el objeto se movió.
+Es la primera vez que `obj.move` corre contra un DC.
 
 Release probada como la usaría alguien que la baja: `HOME` vacío, el AppImage sin permiso de
 ejecución en `~/Descargas/Mis cosas & más/`. El instalador de lanzadores lo encuentra, los
