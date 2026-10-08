@@ -86,8 +86,7 @@ Preferencias declaradas pero sin efecto: `showUsersGroupsAsContainers`, `languag
 muestran como `results`).
 
 Funcionalidad de ADUC que falta del todo: gMSA/MSA, impresoras y carpetas compartidas
-publicadas, Papelera de AD (restaurar objetos borrados), mover con arrastrar y soltar,
-`Enviar correo`, RSAT-like "Buscar" desde el árbol contextual.
+publicadas, Papelera de AD (restaurar objetos borrados), `Enviar correo`, RSAT-like "Buscar" desde el árbol contextual.
 
 ---
 

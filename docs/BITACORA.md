@@ -5,6 +5,33 @@ Registro de lo que se hizo, en qué orden y por qué. El plan a futuro está en
 
 ---
 
+## 2026-10-08 — v0.7.2: mover arrastrando
+
+En ADUC ahora se mueve arrastrando, además de *Mover…* y *Cortar/Pegar*. Se arrastran filas
+de la lista (toda la selección si la fila está seleccionada) y nodos del árbol, y se sueltan
+sobre cualquier contenedor de los dos paneles. Pide confirmación con el destino completo, como
+ADUC, y el árbol expande un nodo cerrado si el puntero se queda 0,7 s encima. La mudanza pasa
+por el mismo `moveObjects` que el diálogo.
+
+`dataTransfer.getData` no se puede leer durante `dragover`, así que los DN arrastrados viven
+en `lib/dnd.ts` y desde ahí se decide si el destino es válido: no deja soltar un contenedor
+dentro de sí mismo ni en la carpeta donde ya está.
+
+Para que se pueda arrastrar una selección múltiple, apretar el botón sobre una fila ya
+seleccionada deja la selección como está, y recién al soltar sin arrastrar queda esa sola
+fila. Antes la selección se reducía apenas se apretaba el botón y el arrastre se llevaba un
+solo objeto.
+
+**No se probó contra el DC:** un arrastre mueve objetos de verdad. Compila, pasa `typecheck`
+y el AppImage arranca, pero el arrastre en sí no se ejecutó.
+
+Release probada como la usaría alguien que la baja: `HOME` vacío, el AppImage sin permiso de
+ejecución en `~/Descargas/Mis cosas & más/`. El instalador de lanzadores lo encuentra, los
+`.desktop` pasan `desktop-file-validate` y la consola abre. Los dos archivos descargados de la
+release coinciden byte a byte con los locales.
+
+---
+
 ## 2026-10-02 — Consola de WSUS: la primera que no habla LDAP
 
 WSUS no deja nada en el directorio. Lo único que hay son los grupos «Administradores WSUS» e
